@@ -76,7 +76,6 @@ class _SidebarState extends State<Sidebar> {
                 _section('GIAN HÀNG'),
                 _item(Icons.dashboard_outlined, 'Bảng điều khiển', '/dashboard'),
                 _item(Icons.store_outlined, 'Thông tin quán', '/store'),
-                _item(Icons.schedule_outlined, 'Lịch mở cửa', '/store/schedule'),
 
                 // THỰC ĐƠN
                 _section('THỰC ĐƠN'),
