@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../data/models/voucher_model.dart';
+import '../../data/services/voucher_api_service.dart';
+import '../../data/services/auth_service.dart';
+import 'voucher_add_edit_page.dart';
 
 class VouchersPage extends StatefulWidget {
   final Function(String)? onNavigate;
@@ -9,11 +14,78 @@ class VouchersPage extends StatefulWidget {
 }
 
 class _VouchersPageState extends State<VouchersPage> {
-  final List<Map<String, dynamic>> _vouchers = [
-    {'code': 'WELCOME20', 'type': '%', 'value': 20, 'minOrder': 100000, 'expiry': '31/12/2025', 'used': 15, 'limit': 50, 'active': true},
-    {'code': 'FREESHIP', 'type': 'cash', 'value': 20000, 'minOrder': 50000, 'expiry': '30/06/2025', 'used': 8, 'limit': 20, 'active': true},
-    {'code': 'SUMMER30', 'type': '%', 'value': 30, 'minOrder': 200000, 'expiry': '31/07/2025', 'used': 50, 'limit': 50, 'active': false},
-  ];
+  final VoucherApiService _apiService = VoucherApiService();
+  final AuthService _authService = AuthService();
+  List<Voucher> _vouchers = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchVouchers();
+  }
+
+  Future<void> _fetchVouchers() async {
+    try {
+      final storeId = await _authService.getStoreId();
+      if (storeId == null) throw 'Không tìm thấy thông tin cửa hàng';
+      final vouchers = await _apiService.getAllVouchers(storeId: storeId);
+      setState(() {
+        _vouchers = vouchers;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) _showNotificationDialog(context, e.toString(), false);
+    }
+  }
+
+  void _showNotificationDialog(BuildContext context, String message, bool isSuccess) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isSuccess ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isSuccess ? Icons.check_circle_outline : Icons.error_outline,
+                color: isSuccess ? Colors.green : const Color(0xFFDC3545),
+                size: 60,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(isSuccess ? 'Thành công!' : 'Có lỗi xảy ra!',
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, color: Colors.black87)),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isSuccess ? Colors.green : const Color(0xFFDC3545),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Đóng', style: TextStyle(fontSize: 16)),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +98,7 @@ class _VouchersPageState extends State<VouchersPage> {
             const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Mã Giảm Giá', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2D))),
+                Text('Mã giảm giá', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2D))),
                 SizedBox(height: 4),
                 Text('Tạo và quản lý voucher khuyến mãi cho quán', style: TextStyle(fontSize: 14, color: Colors.grey)),
               ],
@@ -48,20 +120,23 @@ class _VouchersPageState extends State<VouchersPage> {
         ),
         const SizedBox(height: 24),
         Expanded(
-          child: ListView.separated(
-            itemCount: _vouchers.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, i) => _buildVoucherCard(i, _vouchers[i]),
-          ),
+          child: _isLoading 
+              ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35)))
+              : _vouchers.isEmpty
+                  ? const Center(child: Text('Chưa có mã giảm giá nào'))
+                  : ListView.separated(
+                      itemCount: _vouchers.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      itemBuilder: (context, i) => _buildVoucherCard(i, _vouchers[i]),
+                    ),
         ),
       ],
     );
   }
 
-  Widget _buildVoucherCard(int index, Map<String, dynamic> v) {
-    final isPercent = v['type'] == '%';
-    final discountText = isPercent ? 'Giảm ${v['value']}%' : 'Giảm ${v['value'].toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}đ';
-    final progress = v['used'] / v['limit'];
+  Widget _buildVoucherCard(int index, Voucher v) {
+    final isPercent = v.type == 1;
+    final progress = v.limitCount == 0 ? 0.0 : (v.usedCount / v.limitCount);
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -69,7 +144,7 @@ class _VouchersPageState extends State<VouchersPage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
-        border: Border.all(color: v['active'] ? Colors.transparent : Colors.grey.shade200),
+        border: Border.all(color: v.isActive ? Colors.transparent : Colors.grey.shade200),
       ),
       child: Row(
         children: [
@@ -79,7 +154,7 @@ class _VouchersPageState extends State<VouchersPage> {
             height: 72,
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: v['active']
+                colors: v.isActive
                     ? [const Color(0xFFFF6B35), const Color(0xFFFF8C42)]
                     : [Colors.grey.shade400, Colors.grey.shade500],
                 begin: Alignment.topLeft,
@@ -91,10 +166,11 @@ class _VouchersPageState extends State<VouchersPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  isPercent ? '${v['value']}%' : '${v['value'] ~/ 1000}K',
+                  isPercent ? '${v.value.toInt()}%' : '${v.value ~/ 1000}K',
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
                 ),
-                const Text('OFF', style: TextStyle(color: Colors.white70, fontSize: 10)),
+                const SizedBox(height: 4),
+                const Text('GIẢM', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
               ],
             ),
           ),
@@ -106,19 +182,19 @@ class _VouchersPageState extends State<VouchersPage> {
               children: [
                 Row(
                   children: [
-                    Text(v['code'],
+                    Text(v.code,
                         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1, color: Color(0xFF1E1E2D))),
                     const SizedBox(width: 10),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: v['active'] ? const Color(0xFFE8F5E9) : const Color(0xFFF5F5F5),
+                        color: v.isActive ? const Color(0xFFE8F5E9) : const Color(0xFFF5F5F5),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        v['active'] ? 'Đang chạy' : 'Hết lượt',
+                        v.isActive ? 'Đang chạy' : 'Hết lượt/Đã dừng',
                         style: TextStyle(
-                            color: v['active'] ? Colors.green : Colors.grey,
+                            color: v.isActive ? Colors.green : Colors.grey,
                             fontSize: 11,
                             fontWeight: FontWeight.bold),
                       ),
@@ -127,10 +203,10 @@ class _VouchersPageState extends State<VouchersPage> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '$discountText | Đơn tối thiểu ${v['minOrder'].toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}đ',
+                  '${v.discountText} | ${v.minOrderText}',
                   style: const TextStyle(color: Colors.grey, fontSize: 13),
                 ),
-                Text('HSD: ${v['expiry']}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                Text('HSD: ${v.expiryDateFormatted}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
                 const SizedBox(height: 10),
                 Row(
                   children: [
@@ -146,7 +222,7 @@ class _VouchersPageState extends State<VouchersPage> {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    Text('${v['used']}/${v['limit']} lượt',
+                    Text('${v.usedCount}/${v.limitCount} lượt',
                         style: const TextStyle(fontSize: 12, color: Colors.grey)),
                   ],
                 ),
@@ -159,19 +235,92 @@ class _VouchersPageState extends State<VouchersPage> {
             children: [
               IconButton(
                 onPressed: () {
-                  if (widget.onNavigate != null) widget.onNavigate!('/vouchers/edit');
+                  VoucherFormPage.selectedVoucherToEdit = v;
+                  if (widget.onNavigate != null) {
+                    widget.onNavigate!('/vouchers/edit');
+                  }
                 },
                 icon: const Icon(Icons.edit_outlined, color: Color(0xFFFF6B35)),
                 tooltip: 'Sửa',
               ),
               IconButton(
-                onPressed: () => setState(() => _vouchers.removeAt(index)),
+                onPressed: () => _deleteVoucher(v),
                 icon: const Icon(Icons.delete_outline, color: Colors.red),
                 tooltip: 'Xóa',
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  void _deleteVoucher(Voucher v) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.all(24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.delete_outline,
+                color: Color(0xFFDC3545),
+                size: 60,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text('Xác nhận xóa', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Text('Bạn có chắc chắn muốn xóa mã "${v.code}"?', textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, color: Colors.black87)),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      side: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    child: const Text('Hủy', style: TextStyle(fontSize: 16, color: Colors.black54)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      try {
+                        await _apiService.deleteVoucher(v.id!);
+                        _fetchVouchers();
+                      } catch (e) {
+                        if (mounted) _showNotificationDialog(context, e.toString(), false);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFDC3545),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text('Xóa bỏ', style: TextStyle(fontSize: 16)),
+                  ),
+                ),
+              ],
+            )
+          ],
+        ),
       ),
     );
   }

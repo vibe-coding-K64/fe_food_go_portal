@@ -1,10 +1,96 @@
 import 'package:flutter/material.dart';
 
-class OrderDetailPage extends StatelessWidget {
-  const OrderDetailPage({super.key});
+import '../../data/models/order_model.dart';
+import '../../data/services/order_api_service.dart';
+
+class OrderDetailPage extends StatefulWidget {
+  static Order? currentOrder;
+  final Function(String)? onNavigate;
+  
+  const OrderDetailPage({super.key, this.onNavigate});
+
+  @override
+  State<OrderDetailPage> createState() => _OrderDetailPageState();
+}
+
+class _OrderDetailPageState extends State<OrderDetailPage> {
+  final OrderApiService _apiService = OrderApiService();
+  
+  Future<void> _updateStatus(String newStatus) async {
+    final order = OrderDetailPage.currentOrder;
+    if (order == null || order.id == null) return;
+    try {
+      await _apiService.updateOrderStatus(order.id!, newStatus);
+      final updatedOrder = await _apiService.getOrderById(order.id!);
+      setState(() {
+        OrderDetailPage.currentOrder = updatedOrder;
+      });
+      if (mounted) _showNotificationDialog(context, 'Đã cập nhật trạng thái thành "$newStatus"', true);
+    } catch (e) {
+      if (mounted) _showNotificationDialog(context, 'Lỗi: $e', false);
+    }
+  }
+
+  void _showNotificationDialog(BuildContext context, String message, bool isSuccess) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isSuccess ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isSuccess ? Icons.check_circle_outline : Icons.error_outline,
+                color: isSuccess ? Colors.green : const Color(0xFFDC3545),
+                size: 60,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(isSuccess ? 'Thành công!' : 'Có lỗi xảy ra!',
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, color: Colors.black87)),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isSuccess ? Colors.green : const Color(0xFFDC3545),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Đóng', style: TextStyle(fontSize: 16)),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final order = OrderDetailPage.currentOrder;
+    if (order == null) return const Center(child: Text('Không tìm thấy đơn hàng'));
+    
+    String timeStr = '--:--';
+    if (order.createdAt != null) {
+      timeStr = '${order.createdAt!.hour.toString().padLeft(2, '0')}:${order.createdAt!.minute.toString().padLeft(2, '0')} - ${order.createdAt!.day}/${order.createdAt!.month}';
+    }
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -12,17 +98,19 @@ class OrderDetailPage extends StatelessWidget {
           Row(
             children: [
               IconButton(
-                onPressed: () {},
+                onPressed: () {
+                  if (widget.onNavigate != null) widget.onNavigate!('/orders');
+                },
                 icon: const Icon(Icons.arrow_back_ios_new, size: 18),
               ),
               const SizedBox(width: 8),
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Chi tiết Đơn hàng #OD-001',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2D))),
-                  Text('Đặt lúc 14:23 - Hôm nay',
-                      style: TextStyle(fontSize: 13, color: Colors.grey)),
+                  Text('Chi tiết Đơn hàng #${order.code}',
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2D))),
+                  Text('Đặt lúc $timeStr',
+                      style: const TextStyle(fontSize: 13, color: Colors.grey)),
                 ],
               ),
             ],
@@ -36,9 +124,9 @@ class OrderDetailPage extends StatelessWidget {
                 flex: 3,
                 child: Column(
                   children: [
-                    _buildOrderItems(),
+                    _buildOrderItems(order),
                     const SizedBox(height: 16),
-                    _buildCustomerInfo(),
+                    _buildCustomerInfo(order),
                   ],
                 ),
               ),
@@ -48,9 +136,9 @@ class OrderDetailPage extends StatelessWidget {
                 flex: 2,
                 child: Column(
                   children: [
-                    _buildStatusCard(),
+                    _buildStatusCard(order),
                     const SizedBox(height: 16),
-                    _buildPaymentSummary(),
+                    _buildPaymentSummary(order),
                   ],
                 ),
               ),
@@ -61,13 +149,9 @@ class OrderDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildOrderItems() {
-    final items = [
-      {'name': 'Burger Bò Phô Mai', 'options': 'Thêm phô mai, 50% đá', 'qty': 2, 'price': 89000},
-      {'name': 'Khoai Tây Chiên', 'options': '', 'qty': 1, 'price': 30000},
-    ];
+  Widget _buildOrderItems(Order order) {
     return _card('Danh sách món', [
-      ...items.map((item) => Padding(
+      ...order.items.map((item) => Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -86,60 +170,108 @@ class OrderDetailPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item['name'].toString(), style: const TextStyle(fontWeight: FontWeight.w600)),
-                  if ((item['options'] as String).isNotEmpty)
-                    Text(item['options'].toString(), style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text(item.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  if (item.options.isNotEmpty)
+                    Text(item.options, style: const TextStyle(color: Colors.grey, fontSize: 12)),
                 ],
               ),
             ),
-            Text('x${item['qty']}', style: const TextStyle(color: Colors.grey)),
+            Text('x${item.quantity}', style: const TextStyle(color: Colors.grey)),
             const SizedBox(width: 16),
             Text(
-              '${((item['price'] as int) * (item['qty'] as int)).toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}đ',
+              '${(item.price * item.quantity).toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}đ',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ],
         ),
       )),
-      if (items.isNotEmpty) ...[
-        const Divider(),
-        const Text('Ghi chú: Ít cay, không hành', style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
-      ],
     ]);
   }
 
-  Widget _buildCustomerInfo() {
+  Widget _buildCustomerInfo(Order order) {
     return _card('Thông tin khách hàng & giao hàng', [
-      _row(Icons.person_outline, 'Khách hàng', 'Nguyễn Văn A'),
-      _row(Icons.phone_outlined, 'Số điện thoại', '0901 234 567'),
-      _row(Icons.location_on_outlined, 'Địa chỉ giao', '123 Đường Lê Lợi, Quận 1, TP.HCM'),
-      _row(Icons.delivery_dining_outlined, 'Tài xế', 'Trần B (0987 654 321)'),
+      _row(Icons.person_outline, 'Khách hàng', order.customerName.isEmpty ? 'Khách lạ' : order.customerName),
+      _row(Icons.phone_outlined, 'Số điện thoại', order.customerPhone.isEmpty ? 'Trống' : order.customerPhone),
+      _row(Icons.location_on_outlined, 'Địa chỉ giao', order.deliveryAddress.isEmpty ? 'Tại quán' : order.deliveryAddress),
+      _row(Icons.delivery_dining_outlined, 'Tài xế', order.driverName.isEmpty ? 'Chưa nhận' : '${order.driverName} (${order.driverPhone})'),
     ]);
   }
 
-  Widget _buildStatusCard() {
-    return _card('Trạng thái đơn hàng', [
-      _statusStep('Đặt hàng', '14:23', true),
-      _statusStep('Xác nhận', '14:25', true),
-      _statusStep('Đang chế biến', '14:26', true),
-      _statusStep('Tài xế nhận đơn', '', false),
-      _statusStep('Hoàn thành', '', false),
+  Widget _buildStatusCard(Order order) {
+    bool isCanceled = order.status == 'Đã hủy';
+    int step = 1;
+    if (order.status == 'Đang chế biến') step = 2;
+    if (order.status == 'Đang giao') step = 3;
+    if (order.status == 'Hoàn thành') step = 4;
+    
+    return _card('Trạng thái đơn hàng', isCanceled ? [
+      const Text('Đơn hàng này đã bị hủy', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+    ] : [
+      _statusStep('Đặt hàng', '', step >= 1),
+      _statusStep('Đang chế biến', '', step >= 2),
+      _statusStep('Đang giao', '', step >= 3),
+      _statusStep('Hoàn thành', '', step >= 4),
       const SizedBox(height: 16),
-      Row(
-        children: [
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      if (step == 1)
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => _updateStatus('Đang chế biến'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Bắt đầu chế biến'),
               ),
-              child: const Text('Hoàn tất chế biến'),
             ),
-          ),
-        ],
-      ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => _updateStatus('Đã hủy'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.red,
+                  side: const BorderSide(color: Colors.red),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Từ chối đơn'),
+              ),
+            ),
+          ],
+        ),
+      if (step == 2)
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => _updateStatus('Đang giao'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.purple,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Giao cho tài xế'),
+              ),
+            ),
+          ],
+        ),
+      if (step == 3)
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => _updateStatus('Hoàn thành'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Hoàn thành đơn hàng'),
+              ),
+            ),
+          ],
+        ),
     ]);
   }
 
@@ -165,13 +297,14 @@ class OrderDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildPaymentSummary() {
+  Widget _buildPaymentSummary(Order order) {
     return _card('Thanh toán', [
-      _payRow('Tổng món', '208.000đ'),
-      _payRow('Phí giao hàng', '15.000đ'),
-      _payRow('Giảm giá (SAVE20)', '-20.000đ', color: Colors.green),
+      _payRow('Tổng món', '${order.totalAmount.toInt()}đ'),
+      _payRow('Phí giao hàng', '${order.shippingFee.toInt()}đ'),
+      if (order.discountAmount > 0)
+        _payRow('Giảm giá', '-${order.discountAmount.toInt()}đ', color: Colors.green),
       const Divider(height: 20),
-      _payRow('Tổng cộng', '203.000đ', bold: true, color: const Color(0xFFFF6B35)),
+      _payRow('Tổng cộng', '${order.finalAmount.toInt()}đ', bold: true, color: const Color(0xFFFF6B35)),
       const SizedBox(height: 8),
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -179,11 +312,11 @@ class OrderDetailPage extends StatelessWidget {
           color: const Color(0xFFF3F4F6),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const Row(
+        child: Row(
           children: [
-            Icon(Icons.payment, size: 16, color: Colors.grey),
-            SizedBox(width: 8),
-            Text('Thanh toán: Tiền mặt', style: TextStyle(color: Colors.grey, fontSize: 13)),
+            const Icon(Icons.payment, size: 16, color: Colors.grey),
+            const SizedBox(width: 8),
+            Text('Thanh toán: ${order.paymentMethod}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
           ],
         ),
       ),

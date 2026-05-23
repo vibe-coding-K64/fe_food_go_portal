@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
 
+import '../../data/models/voucher_model.dart';
+import '../../data/services/voucher_api_service.dart';
+import '../../data/services/auth_service.dart';
+
 /// Form dùng chung thêm/sửa voucher
 class VoucherFormPage extends StatefulWidget {
+  static Voucher? selectedVoucherToEdit;
+
   final bool isEdit;
-  const VoucherFormPage({super.key, this.isEdit = false});
+  final Function(String)? onNavigate;
+  const VoucherFormPage({super.key, this.isEdit = false, this.onNavigate});
 
   @override
   State<VoucherFormPage> createState() => _VoucherFormPageState();
 }
 
 class _VoucherFormPageState extends State<VoucherFormPage> {
+  final VoucherApiService _apiService = VoucherApiService();
+  final AuthService _authService = AuthService();
   final _formKey = GlobalKey<FormState>();
   final _codeCtrl = TextEditingController();
   final _valueCtrl = TextEditingController();
@@ -17,6 +26,21 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
   final _limitCtrl = TextEditingController();
   int _discountType = 1; // 1: %, 2: tiền mặt
   DateTime? _expiryDate;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isEdit && VoucherFormPage.selectedVoucherToEdit != null) {
+      final v = VoucherFormPage.selectedVoucherToEdit!;
+      _codeCtrl.text = v.code;
+      _discountType = v.type;
+      _valueCtrl.text = v.value.toString();
+      _minOrderCtrl.text = v.minOrder.toString();
+      _limitCtrl.text = v.limitCount.toString();
+      _expiryDate = v.expiryDate;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +77,10 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
                         const Text('Thông tin Voucher',
                             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2D))),
                         const Divider(height: 24),
-                        _field('Mã voucher (VD: SAVE20)', _codeCtrl, Icons.local_offer_outlined, required: true),
+                        _field('Mã voucher (VD: SAVE20)', _codeCtrl, Icons.local_offer_outlined, required: true, validator: (v) {
+                          if (v != null && v.contains(' ')) return 'Mã không được chứa khoảng trắng';
+                          return null;
+                        }),
                         // Loại giảm giá
                         const Text('Loại giảm giá', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
                         const SizedBox(height: 8),
@@ -73,11 +100,28 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
                           _discountType == 1 ? 'Giá trị giảm (%)' : 'Số tiền giảm (VNĐ)',
                           _valueCtrl, Icons.discount_outlined,
                           required: true, keyboardType: TextInputType.number,
+                          validator: (v) {
+                            if (v != null && v.isNotEmpty && double.tryParse(v) == null) return 'Phải là số hợp lệ';
+                            if (_discountType == 1 && double.tryParse(v ?? '') != null) {
+                              if (double.parse(v!) > 100 || double.parse(v) <= 0) return 'Từ 1 đến 100%';
+                            }
+                            return null;
+                          }
                         ),
                         _field('Đơn tối thiểu (VNĐ)', _minOrderCtrl, Icons.shopping_cart_outlined,
-                            keyboardType: TextInputType.number),
+                            required: true,
+                            keyboardType: TextInputType.number,
+                            validator: (v) {
+                              if (v != null && v.isNotEmpty && double.tryParse(v) == null) return 'Phải là số hợp lệ';
+                              return null;
+                            }),
                         _field('Giới hạn lượt dùng', _limitCtrl, Icons.numbers_outlined,
-                            keyboardType: TextInputType.number),
+                            required: true,
+                            keyboardType: TextInputType.number,
+                            validator: (v) {
+                              if (v != null && v.isNotEmpty && int.tryParse(v) == null) return 'Phải là số nguyên hợp lệ';
+                              return null;
+                            }),
                         const SizedBox(height: 4),
                         // Date picker
                         InkWell(
@@ -109,37 +153,42 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
               Expanded(
                 flex: 2,
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildPreviewCard(),
                     const SizedBox(height: 16),
                     _buildTipsCard(),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        OutlinedButton(
+                          onPressed: () {
+                            if (widget.onNavigate != null) widget.onNavigate!('/vouchers');
+                          },
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: const Text('Hủy'),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: _isSaving ? null : _save,
+                          icon: _isSaving 
+                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              : const Icon(Icons.save_outlined, size: 18),
+                          label: Text(widget.isEdit ? 'Lưu thay đổi' : 'Tạo voucher'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFF6B35),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              OutlinedButton(
-                onPressed: () => Navigator.of(context).maybePop(),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                child: const Text('Hủy'),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton.icon(
-                onPressed: _save,
-                icon: const Icon(Icons.save_outlined, size: 18),
-                label: Text(widget.isEdit ? 'Lưu thay đổi' : 'Tạo voucher'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFF6B35),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
             ],
@@ -174,13 +223,21 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
   }
 
   Widget _field(String label, TextEditingController ctrl, IconData icon,
-      {bool required = false, TextInputType? keyboardType}) {
+      {bool required = false, TextInputType? keyboardType, String? Function(String?)? validator}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
         controller: ctrl,
         keyboardType: keyboardType,
-        validator: required ? (v) => (v == null || v.isEmpty) ? 'Vui lòng nhập $label' : null : null,
+        validator: (v) {
+          if (required && (v == null || v.trim().isEmpty)) {
+            return 'Vui lòng nhập $label';
+          }
+          if (validator != null) {
+            return validator(v);
+          }
+          return null;
+        },
         decoration: InputDecoration(
           labelText: label,
           prefixIcon: Icon(icon, color: const Color(0xFFFF6B35), size: 20),
@@ -263,23 +320,121 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
   }
 
   Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final first = today.add(const Duration(days: 1)); // Bắt đầu từ ngày mai (00:00:00)
+    
+    DateTime initDate = _expiryDate ?? today.add(const Duration(days: 30));
+    if (initDate.isBefore(first)) {
+      initDate = first;
+    }
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 30)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+      initialDate: initDate,
+      firstDate: first,
+      lastDate: today.add(const Duration(days: 365 * 2)),
     );
     if (picked != null) setState(() => _expiryDate = picked);
   }
 
-  void _save() {
-    if (_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(widget.isEdit ? 'Cập nhật voucher thành công!' : 'Tạo voucher thành công!'),
-          backgroundColor: Colors.green,
+  void _showNotificationDialog(BuildContext context, String message, bool isSuccess) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isSuccess ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                isSuccess ? Icons.check_circle_outline : Icons.error_outline,
+                color: isSuccess ? Colors.green : const Color(0xFFDC3545),
+                size: 60,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(isSuccess ? 'Thành công!' : 'Có lỗi xảy ra!',
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, color: Colors.black87)),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  if (isSuccess && widget.onNavigate != null) {
+                    widget.onNavigate!('/vouchers');
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isSuccess ? Colors.green : const Color(0xFFDC3545),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Đóng', style: TextStyle(fontSize: 16)),
+              ),
+            )
+          ],
         ),
-      );
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    if (_formKey.currentState!.validate()) {
+      if (_expiryDate == null) {
+        _showNotificationDialog(context, 'Vui lòng chọn ngày hết hạn', false);
+        return;
+      }
+      
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      if (_expiryDate!.isBefore(today.add(const Duration(days: 1)))) {
+        _showNotificationDialog(context, 'Ngày hết hạn phải lớn hơn ngày hiện tại', false);
+        return;
+      }
+      
+      setState(() => _isSaving = true);
+      
+      try {
+        final storeId = await _authService.getStoreId();
+        if (storeId == null) throw 'Không tìm thấy storeId';
+
+        final newVoucher = Voucher(
+          storeId: storeId,
+          code: _codeCtrl.text.trim().toUpperCase(),
+          type: _discountType,
+          value: double.parse(_valueCtrl.text.trim()),
+          minOrder: double.parse(_minOrderCtrl.text.trim()),
+          limitCount: int.parse(_limitCtrl.text.trim()),
+          usedCount: 0,
+          expiryDate: _expiryDate!,
+          isActive: true,
+        );
+
+        if (widget.isEdit && VoucherFormPage.selectedVoucherToEdit != null) {
+          await _apiService.updateVoucher(VoucherFormPage.selectedVoucherToEdit!.id!, newVoucher);
+          if (mounted) _showNotificationDialog(context, 'Cập nhật voucher thành công!', true);
+        } else {
+          await _apiService.createVoucher(newVoucher);
+          if (mounted) _showNotificationDialog(context, 'Tạo voucher thành công!', true);
+        }
+      } catch (e) {
+        if (mounted) _showNotificationDialog(context, e.toString(), false);
+      } finally {
+        if (mounted) setState(() => _isSaving = false);
+      }
     }
   }
 }

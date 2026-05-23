@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../views/auth/login_page.dart';
 import '../views/layout/admin_layout.dart';
 import '../views/dashboard/dashboard_page.dart';
@@ -6,14 +7,14 @@ import '../views/dashboard/dashboard_page.dart';
 // Import các views mới tạo của Merchant Portal
 import '../views/store/store_info_page.dart';
 import '../views/store/store_schedule_page.dart';
-import '../views/store/store_form_page.dart';
-import '../views/menu_category/menu_category_page.dart';
+import '../views/store/store_add_edit_page.dart';
+import '../data/services/auth_service.dart';
 import '../views/products/product_list_page.dart';
-import '../views/products/product_form_page.dart';
+import '../views/products/product_add_edit_page.dart';
 import '../views/orders/orders_page.dart';
 import '../views/orders/order_detail_page.dart';
 import '../views/vouchers/vouchers_page.dart';
-import '../views/vouchers/voucher_form_page.dart';
+import '../views/vouchers/voucher_add_edit_page.dart';
 import '../views/finance/wallet_page.dart';
 import '../views/finance/transaction_page.dart';
 import '../views/finance/withdrawal_page.dart';
@@ -23,6 +24,7 @@ import '../views/notifications/notifications_page.dart';
 import '../views/report_tickets/report_tickets_page.dart';
 import '../views/profile/profile_page.dart';
 import '../views/profile/settings_page.dart';
+import '../views/categorys/category_page.dart';
 
 class AppRouterDelegate extends RouterDelegate<String>
     with ChangeNotifier, PopNavigatorRouterDelegateMixin<String> {
@@ -57,7 +59,13 @@ class AppRouterDelegate extends RouterDelegate<String>
         page = const StoreSchedulePage();
         break;
       case "/store/edit":
-        page = const StoreFormPage(isEdit: true);
+        page = StoreFormPage(
+          isEdit: true,
+          onNavigate: (path) {
+            _currentPath = path;
+            notifyListeners();
+          },
+        );
         break;
 
       // 2. Thực đơn
@@ -78,10 +86,22 @@ class AppRouterDelegate extends RouterDelegate<String>
         );
         break;
       case "/products/add":
-        page = const ProductFormPage(isEdit: false);
+        page = ProductFormPage(
+          isEdit: false,
+          onNavigate: (path) {
+            _currentPath = path;
+            notifyListeners();
+          },
+        );
         break;
       case "/products/edit":
-        page = const ProductFormPage(isEdit: true);
+        page = ProductFormPage(
+          isEdit: true,
+          onNavigate: (path) {
+            _currentPath = path;
+            notifyListeners();
+          },
+        );
         break;
 
       // 3. Kinh doanh
@@ -94,7 +114,12 @@ class AppRouterDelegate extends RouterDelegate<String>
         );
         break;
       case "/orders/detail":
-        page = const OrderDetailPage();
+        page = OrderDetailPage(
+          onNavigate: (path) {
+            _currentPath = path;
+            notifyListeners();
+          },
+        );
         break;
       case "/vouchers":
         page = VouchersPage(
@@ -105,10 +130,22 @@ class AppRouterDelegate extends RouterDelegate<String>
         );
         break;
       case "/vouchers/add":
-        page = const VoucherFormPage(isEdit: false);
+        page = VoucherFormPage(
+          isEdit: false,
+          onNavigate: (path) {
+            _currentPath = path;
+            notifyListeners();
+          },
+        );
         break;
       case "/vouchers/edit":
-        page = const VoucherFormPage(isEdit: true);
+        page = VoucherFormPage(
+          isEdit: true,
+          onNavigate: (path) {
+            _currentPath = path;
+            notifyListeners();
+          },
+        );
         break;
       case "/reviews":
         page = const ReviewsPage();
@@ -158,21 +195,87 @@ class AppRouterDelegate extends RouterDelegate<String>
         page = const MyDashboard();
     }
 
-    return Navigator(
-      key: navigatorKey,
-      pages: [
-        MaterialPage(
-          child: AdminLayout(
-            currentRoute: _currentPath,
-            onNavigate: (path) {
-              _currentPath = path;
-              notifyListeners();
-            },
-            child: page,
-          ),
-        ),
-      ],
-      onPopPage: (route, result) => route.didPop(result),
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        
+        if (!snapshot.hasData) {
+          return Navigator(
+            key: navigatorKey,
+            pages: [
+              MaterialPage(
+                child: LoginPage(
+                  onLoginSuccess: () {
+                    _currentPath = "/dashboard";
+                    notifyListeners();
+                  },
+                ),
+              ),
+            ],
+            onPopPage: (route, result) => route.didPop(result),
+          );
+        }
+
+        return FutureBuilder<String?>(
+          future: AuthService().getStoreId(),
+          builder: (context, storeSnapshot) {
+            if (storeSnapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35))));
+            }
+
+            final storeId = storeSnapshot.data;
+
+            if (storeId == null) {
+              return Navigator(
+                key: navigatorKey,
+                pages: [
+                  MaterialPage(
+                    child: Scaffold(
+                      appBar: AppBar(
+                        title: const Text('Khởi tạo Gian hàng'),
+                        backgroundColor: const Color(0xFFFF6B35),
+                        foregroundColor: Colors.white,
+                      ),
+                      body: Container(
+                        color: Colors.grey[100],
+                        padding: const EdgeInsets.all(24),
+                        child: StoreFormPage(
+                          isEdit: false,
+                          onNavigate: (path) {
+                            _currentPath = "/dashboard";
+                            notifyListeners();
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                onPopPage: (route, result) => route.didPop(result),
+              );
+            }
+
+            return Navigator(
+              key: navigatorKey,
+              pages: [
+                MaterialPage(
+                  child: AdminLayout(
+                    currentRoute: _currentPath,
+                    onNavigate: (path) {
+                      _currentPath = path;
+                      notifyListeners();
+                    },
+                    child: page,
+                  ),
+                ),
+              ],
+              onPopPage: (route, result) => route.didPop(result),
+            );
+          }
+        );
+      }
     );
   }
 
