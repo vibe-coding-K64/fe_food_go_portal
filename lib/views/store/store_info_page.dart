@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../data/models/store_model.dart';
+import '../../data/services/store_api_service.dart';
+import '../../data/services/auth_service.dart';
 
 class StoreInfoPage extends StatefulWidget {
   final Function(String)? onNavigate;
@@ -9,10 +12,97 @@ class StoreInfoPage extends StatefulWidget {
 }
 
 class _StoreInfoPageState extends State<StoreInfoPage> {
-  bool _isAcceptingOrders = true;
+  final StoreApiService _apiService = StoreApiService();
+  final AuthService _authService = AuthService();
+  Store? _store;
+  bool _isLoading = true;
+  String? _currentStoreId;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStoreInfo();
+  }
+
+  Future<void> _fetchStoreInfo() async {
+    try {
+      _currentStoreId = await _authService.getStoreId();
+      if (_currentStoreId == null) throw 'Không có storeId';
+
+      final store = await _apiService.getStoreById(_currentStoreId!);
+      setState(() {
+        _store = store;
+        _isLoading = false;
+      });
+    } catch (e) {
+      // Ignore for demo, just keep loading or show error
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _toggleAcceptingOrders(bool val) async {
+    if (_store == null) return;
+    
+    // Optimistic update
+    setState(() {
+      _store = Store(
+        id: _store!.id,
+        name: _store!.name,
+        description: _store!.description,
+        address: _store!.address,
+        taxCode: _store!.taxCode,
+        businessLicense: _store!.businessLicense,
+        coverImageUrl: _store!.coverImageUrl,
+        logoUrl: _store!.logoUrl,
+        bankAccountNumber: _store!.bankAccountNumber,
+        bankName: _store!.bankName,
+        isAcceptingOrders: val,
+      );
+    });
+
+    try {
+      if (_currentStoreId != null) {
+        await _apiService.updateStore(_currentStoreId!, _store!);
+      }
+    } catch (e) {
+      // Revert if error
+      setState(() {
+        _store = Store(
+          id: _store!.id,
+          name: _store!.name,
+          description: _store!.description,
+          address: _store!.address,
+          taxCode: _store!.taxCode,
+          businessLicense: _store!.businessLicense,
+          coverImageUrl: _store!.coverImageUrl,
+          logoUrl: _store!.logoUrl,
+          bankAccountNumber: _store!.bankAccountNumber,
+          bankName: _store!.bankName,
+          isAcceptingOrders: !val,
+        );
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lỗi cập nhật trạng thái')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFFFF6B35)),
+      );
+    }
+
+    if (_store == null) {
+      return const Center(child: Text('Không tìm thấy thông tin quán'));
+    }
+
+    final bool isAcceptingOrders = _store!.isAcceptingOrders;
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -24,7 +114,7 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
               const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Thông tin Gian hàng',
+                  Text('Thông tin quán ',
                       style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
@@ -53,28 +143,28 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
           ),
           const SizedBox(height: 24),
 
-          // Toggle nhận đơn khẩn cấp
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: _isAcceptingOrders
-                  ? const Color(0xFFE8F5E9)
-                  : const Color(0xFFFFEBEE),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: _isAcceptingOrders
-                    ? Colors.green.shade300
-                    : Colors.red.shade300,
+            // Toggle nhận đơn khẩn cấp
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isAcceptingOrders
+                    ? const Color(0xFFE8F5E9)
+                    : const Color(0xFFFFEBEE),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isAcceptingOrders
+                      ? Colors.green.shade300
+                      : Colors.red.shade300,
+                ),
               ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  _isAcceptingOrders
-                      ? Icons.store_outlined
-                      : Icons.store_mall_directory_outlined,
-                  color: _isAcceptingOrders ? Colors.green : Colors.red,
-                  size: 32,
+              child: Row(
+                children: [
+                  Icon(
+                    isAcceptingOrders
+                        ? Icons.store_outlined
+                        : Icons.store_mall_directory_outlined,
+                    color: isAcceptingOrders ? Colors.green : Colors.red,
+                    size: 32,
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -82,20 +172,20 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _isAcceptingOrders
+                        isAcceptingOrders
                             ? 'Quán đang NHẬN ĐƠN'
                             : 'Quán đang TẠM NGƯNG',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: _isAcceptingOrders
+                          color: isAcceptingOrders
                               ? Colors.green.shade700
                               : Colors.red.shade700,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        _isAcceptingOrders
+                        isAcceptingOrders
                             ? 'Khách hàng có thể đặt món từ quán bạn'
                             : 'Quán của bạn đang tắt nhận đơn',
                         style:
@@ -105,8 +195,8 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
                   ),
                 ),
                 Switch(
-                  value: _isAcceptingOrders,
-                  onChanged: (val) => setState(() => _isAcceptingOrders = val),
+                  value: isAcceptingOrders,
+                  onChanged: (val) => _toggleAcceptingOrders(val),
                   activeColor: Colors.green,
                 ),
               ],
@@ -145,16 +235,18 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
   }
 
   Widget _buildImageCard() {
+    final coverUrl = _store?.coverImageUrl;
     return Container(
       height: 200,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         color: Colors.grey.shade200,
-        image: const DecorationImage(
-          image: NetworkImage(
-              'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600'),
-          fit: BoxFit.cover,
-        ),
+        image: coverUrl != null && coverUrl.isNotEmpty 
+            ? DecorationImage(
+                image: NetworkImage(coverUrl),
+                fit: BoxFit.cover,
+              )
+            : null,
       ),
       child: Stack(
         children: [
@@ -177,6 +269,7 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
   }
 
   Widget _buildLogoCard() {
+    final logoUrl = _store?.logoUrl;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -190,12 +283,19 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(50),
-            child: Image.network(
-              'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=100',
-              width: 64,
-              height: 64,
-              fit: BoxFit.cover,
-            ),
+            child: logoUrl != null && logoUrl.isNotEmpty
+                ? Image.network(
+                    logoUrl,
+                    width: 64,
+                    height: 64,
+                    fit: BoxFit.cover,
+                  )
+                : Container(
+                    width: 64,
+                    height: 64,
+                    color: Colors.grey.shade300,
+                    child: const Icon(Icons.store, color: Colors.grey),
+                  ),
           ),
           const SizedBox(width: 16),
           const Column(
@@ -203,9 +303,7 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
             children: [
               Text('Logo Quán',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              SizedBox(height: 4),
-              Text('Ảnh đại diện tròn của quán',
-                  style: TextStyle(color: Colors.grey, fontSize: 12)),
+          
             ],
           ),
         ],
@@ -232,13 +330,11 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF1E1E2D))),
           const Divider(height: 24),
-          _infoRow(Icons.store, 'Tên quán', 'FoodGo Burger & Grill'),
-          _infoRow(Icons.description_outlined, 'Mô tả',
-              'Burger thủ công, nguyên liệu tươi mỗi ngày'),
-          _infoRow(Icons.location_on_outlined, 'Địa chỉ',
-              '123 Nguyễn Huệ, Quận 1, TP.HCM'),
-          _infoRow(Icons.receipt_long_outlined, 'Mã số thuế', '0123456789'),
-          _infoRow(Icons.article_outlined, 'Giấy phép KD', 'GP-2024-001 ✓'),
+          _infoRow(Icons.store, 'Tên quán', _store?.name ?? ''),
+          _infoRow(Icons.description_outlined, 'Mô tả', _store?.description ?? ''),
+          _infoRow(Icons.location_on_outlined, 'Địa chỉ', _store?.address ?? ''),
+          _infoRow(Icons.receipt_long_outlined, 'Mã số thuế', _store?.taxCode ?? ''),
+          _infoRow(Icons.article_outlined, 'Giấy phép kinh doanh', _store?.businessLicense ?? ''),
         ],
       ),
     );
@@ -257,7 +353,7 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Tài khoản ngân hàng nhận tiền',
+          const Text('Tài khoản ngân hàng liên kết',
               style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -274,14 +370,14 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
                 child: const Icon(Icons.account_balance, color: Color(0xFFFF6B35)),
               ),
               const SizedBox(width: 16),
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Vietcombank - CN TP.HCM',
-                      style: TextStyle(fontWeight: FontWeight.bold)),
-                  SizedBox(height: 4),
-                  Text('0123 4567 8901 - NGUYEN VAN A',
-                      style: TextStyle(color: Colors.grey)),
+                  Text(_store?.bankName ?? 'Chưa cập nhật',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 4),
+                  Text(_store?.bankAccountNumber ?? 'Chưa có số tài khoản',
+                      style: const TextStyle(color: Colors.grey)),
                 ],
               ),
             ],
