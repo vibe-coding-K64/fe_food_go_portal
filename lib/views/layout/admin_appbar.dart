@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart'; 
+import '../../data/services/auth_service.dart';
  
 class AdminAppBar extends StatelessWidget implements PreferredSizeWidget 
 { 
@@ -122,9 +123,9 @@ class AdminAppBar extends StatelessWidget implements PreferredSizeWidget
                 color: Colors.red, 
               ), 
             ], 
-            onSelected: (value) { 
+            onSelected: (value) async { 
               if (value == "logout") { 
-                debugPrint("Logout clicked"); 
+                await AuthService().logout();
               } 
             }, 
           ), 
