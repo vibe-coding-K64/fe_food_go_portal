@@ -21,22 +21,16 @@ class ProductOption {
 
 class ProductOptionGroup {
   final String name;
-  final bool isRequired;
-  final int maxChoices;
   final List<ProductOption> options;
 
   ProductOptionGroup({
     required this.name, 
-    this.isRequired = false,
-    this.maxChoices = 1,
     required this.options
   });
 
   factory ProductOptionGroup.fromJson(Map<String, dynamic> json) {
     return ProductOptionGroup(
       name: json['name'] ?? '',
-      isRequired: json['isRequired'] ?? false,
-      maxChoices: json['maxChoices'] ?? 1,
       options: (json['options'] as List?)?.map((item) => ProductOption.fromJson(item)).toList() ?? [],
     );
   }
@@ -44,8 +38,6 @@ class ProductOptionGroup {
   Map<String, dynamic> toJson() {
     return {
       'name': name,
-      'isRequired': isRequired,
-      'maxChoices': maxChoices,
       'options': options.map((e) => e.toJson()).toList(),
     };
   }
@@ -63,6 +55,8 @@ class Product {
   final bool isOutOfStock;
   final bool isFeatured;
   final List<ProductOptionGroup>? optionGroups;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   Product({
     this.id,
@@ -76,6 +70,8 @@ class Product {
     this.isOutOfStock = false,
     this.isFeatured = false,
     this.optionGroups,
+    this.createdAt,
+    this.updatedAt,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -88,9 +84,11 @@ class Product {
       description: json['description'] ?? '',
       basePrice: (json['basePrice'] ?? 0).toDouble(),
       imageUrl: json['imageUrl'],
-      isOutOfStock: json['outOfStock'] ?? json['isOutOfStock'] ?? false,
-      isFeatured: json['featured'] ?? json['isFeatured'] ?? false,
+      isOutOfStock: json['isOutOfStock'] ?? false,
+      isFeatured: json['isFeatured'] ?? false,
       optionGroups: (json['optionGroups'] as List?)?.map((item) => ProductOptionGroup.fromJson(item)).toList(),
+      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt']) : null,
+      updatedAt: json['updatedAt'] != null ? DateTime.tryParse(json['updatedAt']) : null,
     );
   }
 
@@ -104,8 +102,8 @@ class Product {
       'description': description,
       'basePrice': basePrice,
       'imageUrl': imageUrl,
-      'outOfStock': isOutOfStock,
-      'featured': isFeatured,
+      'isOutOfStock': isOutOfStock,
+      'isFeatured': isFeatured,
       'optionGroups': optionGroups?.map((e) => e.toJson()).toList(),
     };
   }

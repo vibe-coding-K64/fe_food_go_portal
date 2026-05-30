@@ -29,9 +29,9 @@ class _AdminLayoutState extends State<AdminLayout> {
           Expanded( 
             child: Column(
               children: [
-                const SizedBox(
+                SizedBox(
                   height: 57,
-                  child: AdminAppBar(),
+                  child: AdminAppBar(onNavigate: widget.onNavigate),
                 ),
                 Expanded(
                   child: Container( 
