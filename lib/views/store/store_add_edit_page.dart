@@ -50,6 +50,7 @@ class _StoreFormPageState extends State<StoreFormPage> {
       final store = await _apiService.getStoreById(_currentStoreId!);
       setState(() {
        if (store != null) {
+        _store = store;
         _nameCtrl.text = store.name;
         _addressCtrl.text = store.address;
         _coverUrlCtrl.text = store.backUrl;
@@ -281,7 +282,7 @@ class _StoreFormPageState extends State<StoreFormPage> {
 
         if (widget.isEdit) {
           await _apiService.updateStore(_currentStoreId!, newStore);
-          await _authService.saveStoreId(newStore.id!);
+          await _authService.saveStoreId(_currentStoreId!);
         } else {
           final uid = _authService.currentUser?.uid;
           if (uid == null) throw 'Lỗi xác thực người dùng';
