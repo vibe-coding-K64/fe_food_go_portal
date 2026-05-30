@@ -50,15 +50,20 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
       _store = Store(
         id: _store!.id,
         name: _store!.name,
-        description: _store!.description,
         address: _store!.address,
-        taxCode: _store!.taxCode,
-        businessLicense: _store!.businessLicense,
-        coverImageUrl: _store!.coverImageUrl,
-        logoUrl: _store!.logoUrl,
-        bankAccountNumber: _store!.bankAccountNumber,
-        bankName: _store!.bankName,
-        isAcceptingOrders: val,
+        backUrl: _store!.backUrl,
+        avtUrl: _store!.avtUrl,
+        rating: _store!.rating,
+        reviewCount: _store!.reviewCount,
+        deliveryTime: _store!.deliveryTime,
+        deliveryFee: _store!.deliveryFee,
+        categoryIds: _store!.categoryIds,
+        restaurantCategories: _store!.restaurantCategories,
+        lat: _store!.lat,
+        lng: _store!.lng,
+        createdAt: _store!.createdAt,
+        updatedAt: _store!.updatedAt,
+        isOpen: val,
       );
     });
 
@@ -72,15 +77,20 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
         _store = Store(
           id: _store!.id,
           name: _store!.name,
-          description: _store!.description,
           address: _store!.address,
-          taxCode: _store!.taxCode,
-          businessLicense: _store!.businessLicense,
-          coverImageUrl: _store!.coverImageUrl,
-          logoUrl: _store!.logoUrl,
-          bankAccountNumber: _store!.bankAccountNumber,
-          bankName: _store!.bankName,
-          isAcceptingOrders: !val,
+          backUrl: _store!.backUrl,
+          avtUrl: _store!.avtUrl,
+          rating: _store!.rating,
+          reviewCount: _store!.reviewCount,
+          deliveryTime: _store!.deliveryTime,
+          deliveryFee: _store!.deliveryFee,
+          categoryIds: _store!.categoryIds,
+          restaurantCategories: _store!.restaurantCategories,
+          lat: _store!.lat,
+          lng: _store!.lng,
+          createdAt: _store!.createdAt,
+          updatedAt: _store!.updatedAt,
+          isOpen: !val,
         );
       });
       ScaffoldMessenger.of(context).showSnackBar(
@@ -101,7 +111,7 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
       return const Center(child: Text('Không tìm thấy thông tin quán'));
     }
 
-    final bool isAcceptingOrders = _store!.isAcceptingOrders;
+    final bool isOpen = _store!.isOpen;
 
     return SingleChildScrollView(
       child: Column(
@@ -111,10 +121,10 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Column(
+              Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Thông tin quán ',
+                  Text('Thông tin quán',
                       style: TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
@@ -143,28 +153,22 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
           ),
           const SizedBox(height: 24),
 
-            // Toggle nhận đơn khẩn cấp
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isAcceptingOrders
-                    ? const Color(0xFFE8F5E9)
-                    : const Color(0xFFFFEBEE),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isAcceptingOrders
-                      ? Colors.green.shade300
-                      : Colors.red.shade300,
-                ),
+          // Toggle trạng thái mở cửa
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isOpen ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isOpen ? Colors.green.shade300 : Colors.red.shade300,
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    isAcceptingOrders
-                        ? Icons.store_outlined
-                        : Icons.store_mall_directory_outlined,
-                    color: isAcceptingOrders ? Colors.green : Colors.red,
-                    size: 32,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isOpen ? Icons.store_outlined : Icons.store_mall_directory_outlined,
+                  color: isOpen ? Colors.green : Colors.red,
+                  size: 32,
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -172,30 +176,23 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isAcceptingOrders
-                            ? 'Quán đang NHẬN ĐƠN'
-                            : 'Quán đang TẠM NGƯNG',
+                        isOpen ? 'Quán đang MỞ CỬA' : 'Quán đang ĐÓNG CỬA',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: isAcceptingOrders
-                              ? Colors.green.shade700
-                              : Colors.red.shade700,
+                          color: isOpen ? Colors.green.shade700 : Colors.red.shade700,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        isAcceptingOrders
-                            ? 'Khách hàng có thể đặt món từ quán bạn'
-                            : 'Quán của bạn đang tắt nhận đơn',
-                        style:
-                            TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                        isOpen ? 'Khách hàng có thể đặt món' : 'Quán hiện không nhận đơn',
+                        style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
                       ),
                     ],
                   ),
                 ),
                 Switch(
-                  value: isAcceptingOrders,
+                  value: isOpen,
                   onChanged: (val) => _toggleAcceptingOrders(val),
                   activeColor: Colors.green,
                 ),
@@ -227,15 +224,13 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          _buildContactCard(),
         ],
       ),
     );
   }
 
   Widget _buildImageCard() {
-    final coverUrl = _store?.coverImageUrl;
+    final coverUrl = _store?.backUrl;
     return Container(
       height: 200,
       decoration: BoxDecoration(
@@ -269,7 +264,7 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
   }
 
   Widget _buildLogoCard() {
-    final logoUrl = _store?.logoUrl;
+    final avtUrl = _store?.avtUrl;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -281,21 +276,22 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
       ),
       child: Row(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(50),
-            child: logoUrl != null && logoUrl.isNotEmpty
-                ? Image.network(
-                    logoUrl,
-                    width: 64,
-                    height: 64,
-                    fit: BoxFit.cover,
-                  )
-                : Container(
-                    width: 64,
-                    height: 64,
-                    color: Colors.grey.shade300,
-                    child: const Icon(Icons.store, color: Colors.grey),
-                  ),
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 3),
+              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, spreadRadius: 1)],
+            ),
+            child: CircleAvatar(
+              radius: 32,
+              backgroundColor: Colors.white,
+              backgroundImage: avtUrl != null && avtUrl.isNotEmpty
+                  ? NetworkImage(avtUrl)
+                  : null,
+              child: avtUrl != null && avtUrl.isNotEmpty
+                  ? null
+                  : const Icon(Icons.store, size: 32, color: Colors.grey),
+            ),
           ),
           const SizedBox(width: 16),
           const Column(
@@ -303,7 +299,6 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
             children: [
               Text('Logo Quán',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-          
             ],
           ),
         ],
@@ -331,57 +326,9 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
                   color: Color(0xFF1E1E2D))),
           const Divider(height: 24),
           _infoRow(Icons.store, 'Tên quán', _store?.name ?? ''),
-          _infoRow(Icons.description_outlined, 'Mô tả', _store?.description ?? ''),
           _infoRow(Icons.location_on_outlined, 'Địa chỉ', _store?.address ?? ''),
-          _infoRow(Icons.receipt_long_outlined, 'Mã số thuế', _store?.taxCode ?? ''),
-          _infoRow(Icons.article_outlined, 'Giấy phép kinh doanh', _store?.businessLicense ?? ''),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildContactCard() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Tài khoản ngân hàng liên kết',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E1E2D))),
-          const Divider(height: 24),
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F4F6),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.account_balance, color: Color(0xFFFF6B35)),
-              ),
-              const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(_store?.bankName ?? 'Chưa cập nhật',
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text(_store?.bankAccountNumber ?? 'Chưa có số tài khoản',
-                      style: const TextStyle(color: Colors.grey)),
-                ],
-              ),
-            ],
-          ),
+          _infoRow(Icons.timer_outlined, 'Thời gian giao hàng', _store?.deliveryTime ?? ''),
+          _infoRow(Icons.delivery_dining_outlined, 'Phí giao hàng', '${_store?.deliveryFee ?? 0} đ'),
         ],
       ),
     );

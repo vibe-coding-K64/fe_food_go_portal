@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../data/services/auth_service.dart';
 
 class ProfilePage extends StatefulWidget {
   final Function(String)? onNavigate;
@@ -9,10 +10,45 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  final _nameCtrl = TextEditingController(text: 'FoodGo Burger & Grill');
-  final _emailCtrl = TextEditingController(text: 'foodgo@example.com');
-  final _phoneCtrl = TextEditingController(text: '0901 234 567');
-  final _taxCtrl = TextEditingController(text: '0123456789');
+  final _nameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _taxCtrl = TextEditingController();
+  
+  String? _photoUrl;
+  String _avatarInitials = "UA";
+  String _fullName = "Cửa hàng";
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final profile = await AuthService().getMerchantProfile();
+    if (mounted) {
+      setState(() {
+        _nameCtrl.text = profile['fullName'] ?? '';
+        _emailCtrl.text = profile['email'] ?? '';
+        _phoneCtrl.text = profile['phoneNumber'] ?? '';
+        _taxCtrl.text = profile['taxCode'] ?? '';
+        
+        _photoUrl = profile['photoUrl'];
+        if (profile['fullName'] != null && profile['fullName']!.isNotEmpty) {
+          _fullName = profile['fullName']!;
+          _avatarInitials = _getInitials(_fullName);
+        }
+      });
+    }
+  }
+
+  String _getInitials(String name) {
+    List<String> words = name.trim().split(RegExp(r'\s+'));
+    if (words.isEmpty) return "UA";
+    if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
+    return (words.first.substring(0, 1) + words.last.substring(0, 1)).toUpperCase();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,8 +58,7 @@ class _ProfilePageState extends State<ProfilePage> {
         children: [
           const Text('Hồ sơ của tôi', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2D))),
           const SizedBox(height: 4),
-          const Text('Thông tin tài khoản Merchant', style: TextStyle(fontSize: 14, color: Colors.grey)),
-          const SizedBox(height: 24),
+         
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -43,12 +78,23 @@ class _ProfilePageState extends State<ProfilePage> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(60),
-                            child: Image.network(
-                              'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=120',
-                              width: 100,
-                              height: 100,
-                              fit: BoxFit.cover,
-                            ),
+                            child: _photoUrl != null && _photoUrl!.isNotEmpty
+                                ? Image.network(
+                                    _photoUrl!,
+                                    width: 100,
+                                    height: 100,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Container(
+                                    width: 100,
+                                    height: 100,
+                                    color: const Color(0xFFFF6B35),
+                                    alignment: Alignment.center,
+                                    child: Text(
+                                      _avatarInitials,
+                                      style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
                           ),
                           Positioned(
                             bottom: 0,
@@ -62,7 +108,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      const Text('FoodGo Burger', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text(_fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       const SizedBox(height: 4),
                       const Text('Merchant', style: TextStyle(color: Colors.grey, fontSize: 13)),
                       const SizedBox(height: 16),
@@ -104,7 +150,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         title: const Text('Đổi mật khẩu', style: TextStyle(fontWeight: FontWeight.w500)),
                         subtitle: const Text('Lần đổi gần nhất: 30 ngày trước', style: TextStyle(fontSize: 12)),
                         trailing: OutlinedButton(
-                          onPressed: () {},
+                          onPressed: _showPasswordChangeDialog,
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFFFF6B35),
                             side: const BorderSide(color: Color(0xFFFF6B35)),
@@ -177,9 +223,150 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  void _save() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Lưu hồ sơ thành công!'), backgroundColor: Colors.green),
+  void _showSuccessDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.check_circle_outline, color: Colors.green, size: 60),
+            ),
+            const SizedBox(height: 24),
+            const Text('Thành công!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, color: Colors.black87)),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Đóng', style: TextStyle(fontSize: 16)),
+              ),
+            )
+          ],
+        ),
+      ),
     );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Lỗi'),
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Đóng')),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showPasswordChangeDialog() async {
+    final oldCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool isSaving = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) => AlertDialog(
+          backgroundColor: Colors.white,
+          title: const Text('Đổi mật khẩu', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: oldCtrl,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Mật khẩu cũ', border: OutlineInputBorder()),
+                  validator: (v) => v!.isEmpty ? 'Vui lòng nhập mật khẩu cũ' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: newCtrl,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Mật khẩu mới', border: OutlineInputBorder()),
+                  validator: (v) => v!.length < 6 ? 'Mật khẩu mới ít nhất 6 ký tự' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: confirmCtrl,
+                  obscureText: true,
+                  decoration: const InputDecoration(labelText: 'Xác nhận mật khẩu mới', border: OutlineInputBorder()),
+                  validator: (v) => v != newCtrl.text ? 'Mật khẩu xác nhận không khớp' : null,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSaving ? null : () => Navigator.pop(ctx),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      if (formKey.currentState!.validate()) {
+                        setStateDialog(() => isSaving = true);
+                        try {
+                          await AuthService().changePassword(oldCtrl.text, newCtrl.text);
+                          if (mounted) Navigator.pop(ctx);
+                          _showSuccessDialog('Đổi mật khẩu thành công!');
+                        } catch (e) {
+                          setStateDialog(() => isSaving = false);
+                          _showErrorDialog(e.toString());
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B35), foregroundColor: Colors.white),
+              child: isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Lưu'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    try {
+      await AuthService().updateMerchantProfile(
+        _nameCtrl.text.trim(),
+        _phoneCtrl.text.trim(),
+        _taxCtrl.text.trim(),
+      );
+      
+      if (mounted) {
+        _showSuccessDialog('Cập nhật hồ sơ thành công!');
+        _loadProfile();
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorDialog('Cập nhật thất bại: $e');
+      }
+    }
   }
 }

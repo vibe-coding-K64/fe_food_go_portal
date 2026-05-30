@@ -56,8 +56,6 @@ class _ProductFormPageState extends State<ProductFormPage> {
           _optionGroups = p.optionGroups!.map((g) {
             return {
               'name': g.name,
-              'isRequired': g.isRequired,
-              'maxChoices': g.maxChoices,
               'options': g.options.map((o) => {'name': o.name, 'price': o.price}).toList(),
             };
           }).toList();
@@ -368,7 +366,7 @@ class _ProductFormPageState extends State<ProductFormPage> {
             children: [
               const Text('Nhóm Topping / Size', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2D))),
               TextButton.icon(
-                onPressed: () => setState(() => _optionGroups.add({'name': 'Nhóm mới', 'isRequired': false, 'maxChoices': 1, 'options': []})),
+                onPressed: () => setState(() => _optionGroups.add({'name': 'Nhóm mới', 'options': []})),
                 icon: const Icon(Icons.add, size: 16, color: Color(0xFFFF6B35)),
                 label: const Text('Thêm nhóm', style: TextStyle(color: Color(0xFFFF6B35))),
               ),
@@ -406,16 +404,6 @@ class _ProductFormPageState extends State<ProductFormPage> {
                 ),
               ),
               const SizedBox(width: 12),
-              Row(
-                children: [
-                  const Text('Bắt buộc', style: TextStyle(fontSize: 13)),
-                  Switch(
-                    value: group['isRequired'],
-                    onChanged: (v) => setState(() => _optionGroups[gIdx]['isRequired'] = v),
-                    activeColor: const Color(0xFFFF6B35),
-                  ),
-                ],
-              ),
               IconButton(
                 onPressed: () => setState(() => _optionGroups.removeAt(gIdx)),
                 icon: const Icon(Icons.delete_outline, color: Colors.red),
@@ -503,8 +491,6 @@ class _ProductFormPageState extends State<ProductFormPage> {
           optionGroups: _optionGroups.map((g) {
             return ProductOptionGroup(
               name: g['name'],
-              isRequired: g['isRequired'],
-              maxChoices: g['maxChoices'],
               options: (g['options'] as List).map((o) => ProductOption(
                 name: o['name'],
                 price: (o['price'] as num).toDouble()

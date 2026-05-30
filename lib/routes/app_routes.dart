@@ -238,6 +238,15 @@ class AppRouterDelegate extends RouterDelegate<String>
                         title: const Text('Khởi tạo Gian hàng'),
                         backgroundColor: const Color(0xFFFF6B35),
                         foregroundColor: Colors.white,
+                        actions: [
+                          IconButton(
+                            icon: const Icon(Icons.logout),
+                            tooltip: 'Đăng xuất',
+                            onPressed: () async {
+                              await AuthService().logout();
+                            },
+                          ),
+                        ],
                       ),
                       body: Container(
                         color: Colors.grey[100],
