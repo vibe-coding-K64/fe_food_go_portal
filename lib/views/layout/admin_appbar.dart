@@ -1,13 +1,50 @@
 import 'package:flutter/material.dart'; 
 import '../../data/services/auth_service.dart';
  
-class AdminAppBar extends StatelessWidget implements PreferredSizeWidget 
-{ 
-  const AdminAppBar({super.key}); 
- 
+class AdminAppBar extends StatefulWidget implements PreferredSizeWidget { 
+  final Function(String)? onNavigate;
+  const AdminAppBar({super.key, this.onNavigate}); 
+
+  @override 
+  State<AdminAppBar> createState() => _AdminAppBarState(); 
+
+  @override 
+  Size get preferredSize => const Size.fromHeight(65); 
+} 
+
+class _AdminAppBarState extends State<AdminAppBar> {
+  String _fullName = "Quản trị viên";
+  String _avatarInitials = "UA";
+  String? _photoUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final profile = await AuthService().getMerchantProfile();
+    if (mounted) {
+      setState(() {
+        if (profile['fullName'] != null && profile['fullName']!.isNotEmpty) {
+          _fullName = profile['fullName']!;
+          _avatarInitials = _getInitials(_fullName);
+        }
+        _photoUrl = profile['photoUrl'];
+      });
+    }
+  }
+
+  String _getInitials(String name) {
+    List<String> words = name.trim().split(RegExp(r'\s+'));
+    if (words.isEmpty) return "UA";
+    if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
+    return (words.first.substring(0, 1) + words.last.substring(0, 1)).toUpperCase();
+  }
+
   @override 
   Widget build(BuildContext context) { 
-
  
     return AppBar( 
       backgroundColor: Colors.white, 
@@ -75,11 +112,10 @@ class AdminAppBar extends StatelessWidget implements PreferredSizeWidget
                   Column( 
                     crossAxisAlignment: CrossAxisAlignment.end, 
                     mainAxisAlignment: MainAxisAlignment.center, 
-                    children: const [ 
-                     
+                    children: [ 
                       Text( 
-                        "Quản trị viên", 
-                        style: TextStyle( 
+                        _fullName, 
+                        style: const TextStyle( 
                           fontSize: 11, 
                           color: Color(0xFFFF6B35), 
                         ), 
@@ -95,14 +131,19 @@ class AdminAppBar extends StatelessWidget implements PreferredSizeWidget
                         width: 2, 
                       ), 
                     ), 
-                    child: const CircleAvatar( 
-                      radius: 18, 
-                      backgroundColor: Color(0xFFFF6B35), 
-                      child: Text( 
-                        "UA", 
-                        style: TextStyle(color: Colors.white, fontSize: 12), 
-                      ), 
-                    ), 
+                    child: _photoUrl != null && _photoUrl!.isNotEmpty
+                        ? CircleAvatar(
+                            radius: 18,
+                            backgroundImage: NetworkImage(_photoUrl!),
+                          )
+                        : CircleAvatar( 
+                            radius: 18, 
+                            backgroundColor: const Color(0xFFFF6B35), 
+                            child: Text( 
+                              _avatarInitials, 
+                              style: const TextStyle(color: Colors.white, fontSize: 12), 
+                            ), 
+                          ), 
                   ), 
                   const Icon(Icons.arrow_drop_down, color: Colors.grey),
                     ], 
@@ -114,7 +155,7 @@ class AdminAppBar extends StatelessWidget implements PreferredSizeWidget
                 Icons.person_outline, 
                 "Thông tin cá nhân", 
               ), 
-              _buildPopupItem("settings", Icons.security, "Bảo mật"), 
+              _buildPopupItem("settings", Icons.settings_outlined, "Cài đặt"), 
               const PopupMenuDivider(), 
               _buildPopupItem( 
                 "logout", 
@@ -126,7 +167,11 @@ class AdminAppBar extends StatelessWidget implements PreferredSizeWidget
             onSelected: (value) async { 
               if (value == "logout") { 
                 await AuthService().logout();
-              } 
+              } else if (value == "profile") {
+                if (widget.onNavigate != null) widget.onNavigate!('/profile');
+              } else if (value == "settings") {
+                if (widget.onNavigate != null) widget.onNavigate!('/settings');
+              }
             }, 
           ), 
         ], 
@@ -169,6 +214,4 @@ class AdminAppBar extends StatelessWidget implements PreferredSizeWidget
     ); 
   } 
  
-  @override 
-  Size get preferredSize => const Size.fromHeight(65); // Tăng chiều cao lên một chút cho thoáng 
-} 
+}

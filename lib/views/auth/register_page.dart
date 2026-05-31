@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../data/services/auth_service.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -22,12 +23,21 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!_formKey.currentState!.validate()) return;
     
     setState(() => _isLoading = true);
+    UserCredential? cred;
     try {
+      // 1. Tạo Firebase User trước
+      cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+      );
+
+      // 2. Đăng ký thông tin vào Backend và tạo gian hàng tự động
       await _authService.registerMerchant(
         email: _emailCtrl.text.trim(),
         password: _passwordCtrl.text,
         fullName: _fullNameCtrl.text.trim(),
         phoneNumber: _phoneCtrl.text.trim(),
+        firebaseUid: cred.user!.uid,
       );
       if (mounted) {
         showDialog(
@@ -56,6 +66,12 @@ class _RegisterPageState extends State<RegisterPage> {
         );
       }
     } catch (e) {
+      // Nếu có lỗi sau khi đã tạo Firebase User, thì xóa nó đi để có thể thử lại
+      if (cred != null && cred.user != null) {
+        try {
+          await cred.user!.delete();
+        } catch (_) {}
+      }
       if (mounted) {
         showDialog(
           context: context,
@@ -112,11 +128,11 @@ class _RegisterPageState extends State<RegisterPage> {
                   TextFormField(
                     controller: _fullNameCtrl,
                     decoration: InputDecoration(
-                      labelText: 'Tên hiển thị / Tên quán',
+                      labelText: 'Tên người bán',
                       prefixIcon: const Icon(Icons.store_outlined),
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    validator: (value) => value == null || value.isEmpty ? 'Vui lòng nhập tên hiển thị' : null,
+                    validator: (value) => value == null || value.isEmpty ? 'Vui lòng nhập tên người bán' : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(

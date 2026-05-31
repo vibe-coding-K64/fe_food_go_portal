@@ -20,14 +20,11 @@ class _StoreFormPageState extends State<StoreFormPage> {
   final _formKey = GlobalKey<FormState>();
   
   final _nameCtrl = TextEditingController();
-  final _descCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
-  final _taxCodeCtrl = TextEditingController();
-  final _businessLicenseCtrl = TextEditingController();
+  final _avtUrlCtrl = TextEditingController();
   final _coverUrlCtrl = TextEditingController();
-  final _logoUrlCtrl = TextEditingController();
-  final _bankNameCtrl = TextEditingController();
-  final _bankAccountCtrl = TextEditingController();
+  final _deliveryTimeCtrl = TextEditingController();
+  final _deliveryFeeCtrl = TextEditingController();
   
   bool _isLoading = true;
   bool _isSaving = false;
@@ -52,17 +49,15 @@ class _StoreFormPageState extends State<StoreFormPage> {
 
       final store = await _apiService.getStoreById(_currentStoreId!);
       setState(() {
+       if (store != null) {
         _store = store;
         _nameCtrl.text = store.name;
-        _descCtrl.text = store.description;
         _addressCtrl.text = store.address;
-        _taxCodeCtrl.text = store.taxCode;
-        _businessLicenseCtrl.text = store.businessLicense;
-        _coverUrlCtrl.text = store.coverImageUrl ?? '';
-        _logoUrlCtrl.text = store.logoUrl ?? '';
-        _bankNameCtrl.text = store.bankName ?? '';
-        _bankAccountCtrl.text = store.bankAccountNumber ?? '';
-        _isLoading = false;
+        _coverUrlCtrl.text = store.backUrl;
+        _avtUrlCtrl.text = store.avtUrl;
+        _deliveryTimeCtrl.text = store.deliveryTime;
+        _deliveryFeeCtrl.text = store.deliveryFee.toString();
+      }  _isLoading = false;
       });
     } catch (e) {
       setState(() => _isLoading = false);
@@ -152,31 +147,22 @@ class _StoreFormPageState extends State<StoreFormPage> {
               children: [
                 _buildSection('Thông tin cơ bản', [
                   _field('Tên quán', _nameCtrl, Icons.store_outlined, required: true),
-                  _field('Mô tả', _descCtrl, Icons.description_outlined, maxLines: 3),
                   _field('Địa chỉ', _addressCtrl, Icons.location_on_outlined, required: true),
-                  _field('Mã số thuế', _taxCodeCtrl, Icons.receipt_long_outlined, required: true, validator: (v) {
-                    if (v != null && v.isNotEmpty && int.tryParse(v.trim()) == null) return 'Mã số thuế chỉ chứa chữ số';
+                  _field('Link Ảnh bìa (Backdrop)', _coverUrlCtrl, Icons.image_outlined, required: true),
+                  _field('Link Logo (Avatar)', _avtUrlCtrl, Icons.link, required: true, validator: (v) {
+                    if (v == null || v.isEmpty) return 'Vui lòng nhập link logo';
+                    if (!Uri.tryParse(v)!.hasAbsolutePath) return 'Link không hợp lệ';
                     return null;
                   }),
-                  _field('Giấy phép KD', _businessLicenseCtrl, Icons.article_outlined, required: true),
-                ]),
-                const SizedBox(height: 20),
-                _buildSection('Hình ảnh', [
-                  _field('Link ảnh bìa (Cover)', _coverUrlCtrl, Icons.link, required: true, validator: (v) {
-                    if (v != null && v.isNotEmpty && !v.trim().startsWith('http')) return 'Đường dẫn phải bắt đầu bằng http:// hoặc https://';
-                    return null;
-                  }),
-                  _field('Link Logo quán', _logoUrlCtrl, Icons.link, required: true, validator: (v) {
-                    if (v != null && v.isNotEmpty && !v.trim().startsWith('http')) return 'Đường dẫn phải bắt đầu bằng http:// hoặc https://';
+                  _field('Thời gian giao hàng (VD: 20-30 phút)', _deliveryTimeCtrl, Icons.timer_outlined),
+                  _field('Phí giao hàng (VNĐ)', _deliveryFeeCtrl, Icons.attach_money_outlined, validator: (v) {
+                    if (v != null && v.trim().isNotEmpty && double.tryParse(v.trim()) == null) {
+                      return 'Phí giao hàng phải là số hợp lệ';
+                    }
                     return null;
                   }),
                 ]),
-                const SizedBox(height: 20),
-                _buildSection('Tài khoản ngân hàng nhận tiền', [
-                  _field('Tên ngân hàng (kèm chi nhánh)', _bankNameCtrl, Icons.account_balance_outlined, required: true),
-                  _field('Số tài khoản (kèm tên chủ thẻ)', _bankAccountCtrl, Icons.credit_card_outlined, required: true),
-                ]),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -275,27 +261,35 @@ class _StoreFormPageState extends State<StoreFormPage> {
     if (_formKey.currentState!.validate()) {
       setState(() => _isSaving = true);
       try {
-        final store = Store(
-          id: widget.isEdit ? _currentStoreId ?? '' : '',
+        final newStore = Store(
+          id: _store?.id,
           name: _nameCtrl.text.trim(),
-          description: _descCtrl.text.trim(),
           address: _addressCtrl.text.trim(),
-          taxCode: _taxCodeCtrl.text.trim(),
-          businessLicense: _businessLicenseCtrl.text.trim(),
-          coverImageUrl: _coverUrlCtrl.text.trim(),
-          logoUrl: _logoUrlCtrl.text.trim(),
-          bankName: _bankNameCtrl.text.trim(),
-          bankAccountNumber: _bankAccountCtrl.text.trim(),
-          isAcceptingOrders: _store?.isAcceptingOrders ?? true,
+          backUrl: _coverUrlCtrl.text.trim(),
+          avtUrl: _avtUrlCtrl.text.trim(),
+          isOpen: _store?.isOpen ?? true,
+          rating: _store?.rating ?? 5.0,
+          reviewCount: _store?.reviewCount ?? 0,
+          deliveryTime: _deliveryTimeCtrl.text.trim().isNotEmpty ? _deliveryTimeCtrl.text.trim() : (_store?.deliveryTime ?? '20-30 phút'),
+          deliveryFee: _deliveryFeeCtrl.text.trim().isNotEmpty ? (double.tryParse(_deliveryFeeCtrl.text.trim()) ?? (_store?.deliveryFee ?? 15000.0)) : (_store?.deliveryFee ?? 15000.0),
+          categoryIds: _store?.categoryIds ?? [],
+          restaurantCategories: _store?.restaurantCategories,
+          lat: _store?.lat,
+          lng: _store?.lng,
+          createdAt: _store?.createdAt,
+          updatedAt: _store?.updatedAt,
         );
 
         if (widget.isEdit) {
-          await _apiService.updateStore(_currentStoreId!, store);
+          await _apiService.updateStore(_currentStoreId!, newStore);
+          await _authService.saveStoreId(_currentStoreId!);
         } else {
           final uid = _authService.currentUser?.uid;
           if (uid == null) throw 'Lỗi xác thực người dùng';
-          final newStore = await _apiService.createStore(uid, store);
-          await _authService.saveStoreId(newStore.id!);
+          final createdStore = await _apiService.createStore(uid, newStore);
+          if (createdStore.id != null) {
+              await _authService.saveStoreId(createdStore.id!);
+          }
         }
         
         if (mounted) {

@@ -32,7 +32,7 @@ class Voucher {
       code: json['code'] ?? '',
       type: json['type'] ?? 1,
       value: (json['value'] ?? 0).toDouble(),
-      minOrder: (json['minOrder'] ?? 0).toDouble(),
+      minOrder: (json['minOrderValue'] ?? json['minOrder'] ?? 0).toDouble(),
       limitCount: json['limitCount'] ?? 0,
       usedCount: json['usedCount'] ?? 0,
       expiryDate: json['expiryDate'] != null 
@@ -49,7 +49,7 @@ class Voucher {
       'code': code,
       'type': type,
       'value': value,
-      'minOrder': minOrder,
+      'minOrderValue': minOrder,
       'limitCount': limitCount,
       'usedCount': usedCount,
       'expiryDate': expiryDate.toIso8601String(),
