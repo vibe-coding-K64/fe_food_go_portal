@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../data/models/transaction_model.dart';
+import '../../data/services/wallet_api_service.dart';
 
 class TransactionPage extends StatefulWidget {
   const TransactionPage({super.key});
@@ -10,18 +13,36 @@ class TransactionPage extends StatefulWidget {
 class _TransactionPageState extends State<TransactionPage> {
   String _filter = 'Tất cả';
   final List<String> _filters = ['Tất cả', 'Tiền vào', 'Tiền ra'];
+  final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
 
-  final List<Map<String, dynamic>> _transactions = [
-    {'type': 'credit', 'desc': 'Đơn hàng #OD-001 hoàn thành', 'amount': 89000, 'time': '14:23 18/05/2025', 'reason': 'Doanh thu đơn hàng'},
-    {'type': 'credit', 'desc': 'Đơn hàng #OD-002 hoàn thành', 'amount': 130000, 'time': '13:40 18/05/2025', 'reason': 'Doanh thu đơn hàng'},
-    {'type': 'debit', 'desc': 'Rút tiền về Vietcombank', 'amount': 2000000, 'time': '10:00 18/05/2025', 'reason': 'Yêu cầu rút tiền #W-045'},
-    {'type': 'credit', 'desc': 'Đơn hàng #OD-003 hoàn thành', 'amount': 215000, 'time': '09:12 17/05/2025', 'reason': 'Doanh thu đơn hàng'},
-    {'type': 'debit', 'desc': 'Rút tiền về Vietcombank', 'amount': 5000000, 'time': '08:00 15/05/2025', 'reason': 'Yêu cầu rút tiền #W-044'},
-  ];
+  List<Transaction> _transactions = [];
+  bool _isLoading = true;
+  final WalletApiService _apiService = WalletApiService();
 
-  List<Map<String, dynamic>> get _filtered {
-    if (_filter == 'Tiền vào') return _transactions.where((t) => t['type'] == 'credit').toList();
-    if (_filter == 'Tiền ra') return _transactions.where((t) => t['type'] == 'debit').toList();
+  @override
+  void initState() {
+    super.initState();
+    _fetchTransactions();
+  }
+
+  Future<void> _fetchTransactions() async {
+    try {
+      final transactions = await _apiService.getTransactions(page: 0, size: 50);
+      setState(() {
+        _transactions = transactions;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
+  List<Transaction> get _filtered {
+    if (_filter == 'Tiền vào') return _transactions.where((t) => t.type == 'order_payment' || t.type == 'delivery_income' || t.type == 'refund').toList();
+    if (_filter == 'Tiền ra') return _transactions.where((t) => t.type == 'withdrawal').toList();
     return _transactions;
   }
 
@@ -93,10 +114,11 @@ class _TransactionPageState extends State<TransactionPage> {
     );
   }
 
-  Widget _buildRow(Map<String, dynamic> tx) {
-    final isCredit = tx['type'] == 'credit';
-    final amt = tx['amount'] as int;
-    final amtText = amt.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.');
+  Widget _buildRow(Transaction tx) {
+    final isCredit = tx.type == 'order_payment' || tx.type == 'delivery_income' || tx.type == 'refund';
+    final amountStr = _currencyFormat.format(tx.netAmount);
+    final timeStr = tx.createdAt != null ? DateFormat('HH:mm dd/MM/yyyy').format(tx.createdAt!) : '';
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
       child: Row(
@@ -112,13 +134,13 @@ class _TransactionPageState extends State<TransactionPage> {
                 color: isCredit ? Colors.green : Colors.red, size: 18),
           ),
           const SizedBox(width: 12),
-          Expanded(child: Text(tx['desc'], style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13))),
-          SizedBox(width: 200, child: Text(tx['time'], style: const TextStyle(color: Colors.grey, fontSize: 12))),
-          SizedBox(width: 160, child: Text(tx['reason'], style: const TextStyle(color: Colors.grey, fontSize: 12))),
+          Expanded(child: Text(tx.description, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13))),
+          SizedBox(width: 200, child: Text(timeStr, style: const TextStyle(color: Colors.grey, fontSize: 12))),
+          SizedBox(width: 160, child: Text(tx.type == 'order_payment' ? 'Doanh thu đơn hàng' : (tx.type == 'withdrawal' ? 'Yêu cầu rút tiền' : ''), style: const TextStyle(color: Colors.grey, fontSize: 12))),
           SizedBox(
             width: 140,
             child: Text(
-              '${isCredit ? '+' : '-'}$amtText đ',
+              '${isCredit ? '+' : '-'}$amountStr',
               style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: isCredit ? Colors.green : Colors.red,
