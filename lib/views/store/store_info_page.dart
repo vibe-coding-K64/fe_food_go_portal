@@ -294,11 +294,11 @@ class _StoreInfoPageState extends State<StoreInfoPage> {
             ),
           ),
           const SizedBox(width: 16),
-          const Column(
+          Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Logo Quán',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              Text(_store?.name ?? 'Tên Quán',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             ],
           ),
         ],
