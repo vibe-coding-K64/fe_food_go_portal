@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/voucher_model.dart';
 import 'api_constants.dart';
 
@@ -8,14 +9,30 @@ class VoucherApiService {
     connectTimeout: const Duration(seconds: 10),
     receiveTimeout: const Duration(seconds: 10),
     headers: {'Content-Type': 'application/json'},
-  ));
+  ))..interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          final token = await user.getIdToken();
+          options.headers['Authorization'] = 'Bearer $token';
+          options.headers['X-Firebase-Token'] = token;
+        }
+        return handler.next(options);
+      },
+    ));
 
   Future<List<Voucher>> getAllVouchers({String? storeId}) async {
     try {
-      final response = await _dio.get('/vouchers', queryParameters: storeId != null ? {'storeId': storeId} : null);
+      final String url = storeId != null ? '/vouchers/store/$storeId' : '/vouchers';
+      final response = await _dio.get(url);
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data;
-        return data.map((json) => Voucher.fromJson(json)).toList();
+        if (storeId != null && response.data is Map && response.data['success'] == true) {
+          final List<dynamic> data = response.data['data'];
+          return data.map((json) => Voucher.fromJson(json)).toList();
+        } else if (storeId == null && response.data is List) {
+          final List<dynamic> data = response.data;
+          return data.map((json) => Voucher.fromJson(json)).toList();
+        }
       }
       throw Exception('Failed to load vouchers');
     } catch (e) {

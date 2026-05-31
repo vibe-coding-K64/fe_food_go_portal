@@ -136,15 +136,13 @@ class _VouchersPageState extends State<VouchersPage> {
 
   Widget _buildVoucherCard(int index, Voucher v) {
     final isPercent = v.type == 1;
-    final progress = v.limitCount == 0 ? 0.0 : (v.usedCount / v.limitCount);
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
-        border: Border.all(color: v.isActive ? Colors.transparent : Colors.grey.shade200),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Row(
         children: [
@@ -153,78 +151,86 @@ class _VouchersPageState extends State<VouchersPage> {
             width: 72,
             height: 72,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: v.isActive
-                    ? [const Color(0xFFFF6B35), const Color(0xFFFF8C42)]
-                    : [Colors.grey.shade400, Colors.grey.shade500],
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFF6B35), Color(0xFFFF8C42)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  isPercent ? '${v.value.toInt()}%' : '${v.value ~/ 1000}K',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
-                ),
-                const SizedBox(height: 4),
-                const Text('GIẢM', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.all(4.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      isPercent ? '${v.value.toInt()}%' : '${v.value ~/ 1000}K',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text('GIẢM', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
           ),
           const SizedBox(width: 20),
           // Info
           Expanded(
-            child: Column(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Text(v.code,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1, color: Color(0xFF1E1E2D))),
-                    const SizedBox(width: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: v.isActive ? const Color(0xFFE8F5E9) : const Color(0xFFF5F5F5),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        v.isActive ? 'Đang chạy' : 'Hết lượt/Đã dừng',
-                        style: TextStyle(
-                            color: v.isActive ? Colors.green : Colors.grey,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ],
+                // Phần thông tin chính bên trái
+                Expanded(
+                  flex: 5,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(v.code,
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1, color: Color(0xFF1E1E2D))),
+                      const SizedBox(height: 6),
+                      Text(v.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
+                      const SizedBox(height: 4),
+                      Text(v.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.grey, fontSize: 13, height: 1.4)),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '${v.discountText} | ${v.minOrderText}',
-                  style: const TextStyle(color: Colors.grey, fontSize: 13),
-                ),
-                Text('HSD: ${v.expiryDateFormatted}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          backgroundColor: Colors.grey.shade200,
-                          color: progress >= 1 ? Colors.red : const Color(0xFFFF6B35),
-                          minHeight: 6,
+                const SizedBox(width: 16),
+                // Phần thông số phụ bên phải
+                Expanded(
+                  flex: 4,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF0ED),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFFD8CD)),
+                        ),
+                        child: Text(
+                          'Còn lại: ${v.remaining}',
+                          style: const TextStyle(fontSize: 13, color: Color(0xFFFF6B35), fontWeight: FontWeight.bold),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text('${v.usedCount}/${v.limitCount} lượt',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                  ],
+                      const SizedBox(height: 12),
+                      Text(
+                        v.discountText,
+                        style: const TextStyle(color: Color(0xFF1E1E2D), fontWeight: FontWeight.bold, fontSize: 14),
+                        textAlign: TextAlign.right,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        v.minOrderText,
+                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                        textAlign: TextAlign.right,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

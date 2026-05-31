@@ -87,9 +87,23 @@ class Product {
       isOutOfStock: json['isOutOfStock'] ?? false,
       isFeatured: json['isFeatured'] ?? false,
       optionGroups: (json['optionGroups'] as List?)?.map((item) => ProductOptionGroup.fromJson(item)).toList(),
-      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt']) : null,
-      updatedAt: json['updatedAt'] != null ? DateTime.tryParse(json['updatedAt']) : null,
+      createdAt: _parseDate(json['createdAt']),
+      updatedAt: _parseDate(json['updatedAt']),
     );
+  }
+
+  static DateTime? _parseDate(dynamic dateData) {
+    if (dateData == null) return null;
+    if (dateData is String) return DateTime.tryParse(dateData);
+    if (dateData is int) return DateTime.fromMillisecondsSinceEpoch(dateData);
+    if (dateData is Map<String, dynamic>) {
+      if (dateData.containsKey('_seconds')) {
+        return DateTime.fromMillisecondsSinceEpoch((dateData['_seconds'] as int) * 1000);
+      } else if (dateData.containsKey('seconds')) {
+        return DateTime.fromMillisecondsSinceEpoch((dateData['seconds'] as int) * 1000);
+      }
+    }
+    return null;
   }
 
   Map<String, dynamic> toJson() {
