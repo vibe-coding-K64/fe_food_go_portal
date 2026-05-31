@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/store_model.dart';
 import 'api_constants.dart';
 
@@ -7,7 +8,17 @@ class StoreApiService {
     baseUrl: ApiConstants.baseUrl,
     connectTimeout: const Duration(seconds: 10),
     receiveTimeout: const Duration(seconds: 10),
-  ));
+  ))..interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          final token = await user.getIdToken();
+          options.headers['Authorization'] = 'Bearer $token';
+          options.headers['X-Firebase-Token'] = token;
+        }
+        return handler.next(options);
+      },
+    ));
 
   // Lấy thông tin quán theo ID
   Future<Store> getStoreById(String id) async {

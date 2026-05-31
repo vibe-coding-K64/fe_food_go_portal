@@ -28,14 +28,28 @@ class Review {
       id: json['id'],
       storeId: json['storeId'] ?? '',
       orderId: json['orderId'] ?? '',
-      customerId: json['customerId'] ?? '',
-      customerName: json['customerName'] ?? '',
-      rating: (json['rating'] ?? 0).toDouble(),
+      customerId: json['userId'] ?? json['customerId'] ?? '',
+      customerName: json['userName'] ?? json['customerName'] ?? '',
+      rating: (json['starRating'] ?? json['rating'] ?? 0).toDouble(),
       comment: json['comment'] ?? '',
-      merchantReply: json['merchantReply'],
-      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'].toString()) : null,
-      repliedAt: json['repliedAt'] != null ? DateTime.tryParse(json['repliedAt'].toString()) : null,
+      merchantReply: json['replyComment'] ?? json['merchantReply'],
+      createdAt: _parseDate(json['createdAt']),
+      repliedAt: _parseDate(json['repliedAt']),
     );
+  }
+
+  static DateTime? _parseDate(dynamic dateData) {
+    if (dateData == null) return null;
+    if (dateData is String) return DateTime.tryParse(dateData);
+    if (dateData is int) return DateTime.fromMillisecondsSinceEpoch(dateData);
+    if (dateData is Map<String, dynamic>) {
+      if (dateData.containsKey('_seconds')) {
+        return DateTime.fromMillisecondsSinceEpoch((dateData['_seconds'] as int) * 1000);
+      } else if (dateData.containsKey('seconds')) {
+        return DateTime.fromMillisecondsSinceEpoch((dateData['seconds'] as int) * 1000);
+      }
+    }
+    return null;
   }
 
   Map<String, dynamic> toJson() {

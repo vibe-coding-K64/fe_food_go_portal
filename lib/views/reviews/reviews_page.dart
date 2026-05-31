@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
-
+import '../../data/models/review_model.dart';
+import '../../data/services/review_api_service.dart';
+import 'package:intl/intl.dart';
+import '../../data/models/store_model.dart';
+import '../../data/services/store_api_service.dart';
+import '../../data/services/auth_service.dart';
 class ReviewsPage extends StatefulWidget {
   const ReviewsPage({super.key});
 
@@ -7,22 +12,57 @@ class ReviewsPage extends StatefulWidget {
   State<ReviewsPage> createState() => _ReviewsPageState();
 }
 
+
 class _ReviewsPageState extends State<ReviewsPage> {
   int _filterStar = 0;
-  final List<Map<String, dynamic>> _reviews = [
-    {'customer': 'Nguyễn Văn A', 'rating': 5, 'comment': 'Món ngon lắm, giao hàng nhanh!', 'date': '18/05/2025', 'replied': false, 'images': 2},
-    {'customer': 'Trần Thị B', 'rating': 4, 'comment': 'Đồ ăn ngon nhưng giao hơi lâu một chút.', 'date': '17/05/2025', 'replied': true, 'images': 0},
-    {'customer': 'Lê Văn C', 'rating': 2, 'comment': 'Thiếu món, phục vụ cần cải thiện thêm.', 'date': '16/05/2025', 'replied': false, 'images': 1},
-    {'customer': 'Phạm Thị D', 'rating': 5, 'comment': 'Rất hài lòng, sẽ ủng hộ tiếp!', 'date': '15/05/2025', 'replied': true, 'images': 0},
-  ];
+  List<Review> _reviews = [];
+  bool _isLoading = true;
+  final ReviewApiService _apiService = ReviewApiService();
+  final StoreApiService _storeApiService = StoreApiService();
+  final AuthService _authService = AuthService();
+  String? _currentStoreId;
+  Store? _currentStore;
 
-  List<Map<String, dynamic>> get _filtered => _filterStar == 0
+  @override
+  void initState() {
+    super.initState();
+    _fetchReviews();
+  }
+
+  Future<void> _fetchReviews() async {
+    try {
+      if (_currentStoreId == null) {
+        _currentStoreId = await _authService.getStoreId();
+      }
+      if (_currentStoreId == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+      
+      final storeFuture = _storeApiService.getStoreById(_currentStoreId!);
+      final reviewsFuture = _apiService.getStoreReviews(_currentStoreId!);
+      final results = await Future.wait([storeFuture, reviewsFuture]);
+      
+      setState(() {
+        _currentStore = results[0] as Store;
+        _reviews = results[1] as List<Review>;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
+  List<Review> get _filtered => _filterStar == 0
       ? _reviews
-      : _reviews.where((r) => r['rating'] == _filterStar).toList();
+      : _reviews.where((r) => r.rating.round() == _filterStar).toList();
 
   double get _avgRating {
     if (_reviews.isEmpty) return 0;
-    return _reviews.map((r) => r['rating'] as int).reduce((a, b) => a + b) / _reviews.length;
+    return _reviews.map((r) => r.rating).reduce((a, b) => a + b) / _reviews.length;
   }
 
   @override
@@ -103,9 +143,19 @@ class _ReviewsPageState extends State<ReviewsPage> {
     );
   }
 
-  Widget _starDistribution() {
+  Map<int, int> get _ratingCounts {
     final counts = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0};
-    for (final r in _reviews) counts[r['rating'] as int] = (counts[r['rating'] as int] ?? 0) + 1;
+    for (final r in _reviews) {
+      final int ratingInt = r.rating.round();
+      if (counts.containsKey(ratingInt)) {
+        counts[ratingInt] = (counts[ratingInt] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }
+
+  Widget _starDistribution() {
+    final counts = _ratingCounts;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -139,7 +189,12 @@ class _ReviewsPageState extends State<ReviewsPage> {
     );
   }
 
-  Widget _buildReviewCard(int index, Map<String, dynamic> review) {
+  Widget _buildReviewCard(int index, Review review) {
+    bool hasReplied = review.merchantReply != null && review.merchantReply!.isNotEmpty;
+    String dateStr = review.createdAt != null 
+        ? DateFormat('dd/MM/yyyy HH:mm').format(review.createdAt!) 
+        : 'Không rõ';
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -155,26 +210,28 @@ class _ReviewsPageState extends State<ReviewsPage> {
               CircleAvatar(
                 radius: 20,
                 backgroundColor: const Color(0xFFFFF3E0),
-                child: Text(review['customer'].toString()[0],
-                    style: const TextStyle(color: Color(0xFFFF6B35), fontWeight: FontWeight.bold)),
+                child: Text(
+                  review.customerName.isNotEmpty ? review.customerName[0].toUpperCase() : '?',
+                  style: const TextStyle(color: Color(0xFFFF6B35), fontWeight: FontWeight.bold)
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(review['customer'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    Text(review['date'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    Text(review.customerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    Text(dateStr, style: const TextStyle(color: Colors.grey, fontSize: 12)),
                   ],
                 ),
               ),
               Row(
                 children: List.generate(5, (i) => Icon(
-                  i < (review['rating'] as int) ? Icons.star : Icons.star_outline,
+                  i < review.rating.round() ? Icons.star : Icons.star_outline,
                   color: Colors.amber, size: 16,
                 )),
               ),
-              if (review['replied'])
+              if (hasReplied)
                 Container(
                   margin: const EdgeInsets.only(left: 8),
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -184,24 +241,52 @@ class _ReviewsPageState extends State<ReviewsPage> {
             ],
           ),
           const SizedBox(height: 12),
-          Text(review['comment'], style: const TextStyle(fontSize: 14, height: 1.5)),
-          if ((review['images'] as int) > 0) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(Icons.photo_library_outlined, size: 14, color: Colors.grey),
-                const SizedBox(width: 4),
-                Text('${review['images']} ảnh đính kèm', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
+          Text(review.comment, style: const TextStyle(fontSize: 14, height: 1.5)),
+          if (hasReplied) ...[
+            const SizedBox(height: 12),
+            Container(
+              margin: const EdgeInsets.only(top: 12, left: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF9F0),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                  bottomLeft: Radius.circular(4),
+                ),
+                border: Border.all(color: const Color(0xFFFFE0B2), width: 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 14,
+                        backgroundImage: NetworkImage(_currentStore?.avtUrl ?? 'https://cdn-icons-png.flaticon.com/512/1904/1904428.png'),
+                        backgroundColor: Colors.transparent,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(_currentStore?.name ?? 'Cửa hàng FoodGo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFE65100))),
+                      const Spacer(),
+                      if (review.repliedAt != null)
+                        Text(DateFormat('dd/MM/yyyy HH:mm').format(review.repliedAt!.toLocal()), style: const TextStyle(color: Colors.black45, fontSize: 11)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(review.merchantReply!, style: const TextStyle(fontSize: 14, color: Colors.black87, height: 1.4)),
+                ],
+              ),
             ),
           ],
           const SizedBox(height: 12),
-          if (!review['replied'])
+          if (!hasReplied && review.id != null)
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 ElevatedButton.icon(
-                  onPressed: () => _showReplyDialog(context, index),
+                  onPressed: () => _showReplyDialog(context, index, review),
                   icon: const Icon(Icons.reply_outlined, size: 16),
                   label: const Text('Phản hồi'),
                   style: ElevatedButton.styleFrom(
@@ -218,40 +303,89 @@ class _ReviewsPageState extends State<ReviewsPage> {
     );
   }
 
-  void _showReplyDialog(BuildContext context, int index) {
+  void _showReplyDialog(BuildContext context, int index, Review review) {
     final ctrl = TextEditingController();
+    bool isSubmitting = false;
+
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Phản hồi đánh giá'),
-        content: SizedBox(
-          width: 400,
-          child: TextFormField(
-            controller: ctrl,
-            maxLines: 4,
-            autofocus: true,
-            decoration: InputDecoration(
-              hintText: 'Cảm ơn bạn đã ủng hộ quán...',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFFF6B35))),
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Phản hồi đánh giá'),
+            content: SizedBox(
+              width: 400,
+              child: TextFormField(
+                controller: ctrl,
+                maxLines: 4,
+                autofocus: true,
+                enabled: !isSubmitting,
+                decoration: InputDecoration(
+                  hintText: 'Cảm ơn bạn đã ủng hộ quán...',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFFF6B35))),
+                ),
+              ),
             ),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
-          ElevatedButton(
-            onPressed: () {
-              if (ctrl.text.isNotEmpty) {
-                setState(() => _reviews[index]['replied'] = true);
-                Navigator.pop(context);
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B35), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-            child: const Text('Gửi phản hồi'),
-          ),
-        ],
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(ctx), 
+                child: const Text('Hủy')
+              ),
+              ElevatedButton(
+                onPressed: isSubmitting ? null : () async {
+                  if (ctrl.text.trim().isEmpty) return;
+                  setDialogState(() => isSubmitting = true);
+                  try {
+                    final updatedReview = await _apiService.replyReview(review.id!, ctrl.text.trim());
+                    setState(() {
+                      int targetIndex = _reviews.indexWhere((r) => r.id == review.id);
+                      if (targetIndex != -1) {
+                        _reviews[targetIndex] = updatedReview;
+                      }
+                    });
+                    if (ctx.mounted) Navigator.pop(ctx);
+                  } catch (e) {
+                    setDialogState(() => isSubmitting = false);
+                    if (ctx.mounted) {
+                      _showNotification(ctx, e.toString(), false);
+                    }
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B35), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                child: isSubmitting ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Gửi phản hồi'),
+              ),
+            ],
+          );
+        }
       ),
+    );
+  }
+
+  void _showNotification(BuildContext context, String message, bool isSuccess) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(isSuccess ? Icons.check_circle : Icons.error, color: isSuccess ? Colors.green : Colors.red, size: 48),
+            const SizedBox(height: 16),
+            Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B35), foregroundColor: Colors.white),
+              child: const Text('Đóng'),
+            )
+          ],
+        ),
+      )
     );
   }
 }
