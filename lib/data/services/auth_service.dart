@@ -70,6 +70,7 @@ class AuthService {
     required String password,
     required String fullName,
     required String phoneNumber,
+    String? firebaseUid,
   }) async {
     try {
       final response = await _dio.post('/auth/register-merchant', data: {
@@ -77,6 +78,7 @@ class AuthService {
         'password': password,
         'fullName': fullName,
         'phoneNumber': phoneNumber,
+        if (firebaseUid != null) 'firebaseUid': firebaseUid,
       });
 
       if (response.statusCode != 200) {

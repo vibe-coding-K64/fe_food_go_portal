@@ -87,7 +87,7 @@ class _LoginPageState extends State<LoginPage> {
                       ), 
                       const SizedBox(height: 10), 
                       const Text( 
-                        "Hệ thống quản trị cửa hàng Pizza", 
+                        "Đăng nhập để quản lý gian hàng của bạn!", 
                         style: TextStyle(color: Colors.grey), 
                       ), 
                       const SizedBox(height: 30), 
@@ -150,6 +150,17 @@ class _LoginPageState extends State<LoginPage> {
                               if (mounted) widget.onLoginSuccess();
                             } catch (e) {
                               if (mounted) {
+                                String errorMsg = e.toString().replaceAll('Exception: ', '');
+                                if (errorMsg.contains('invalid-credential') || errorMsg.contains('wrong-password') || errorMsg.contains('user-not-found')) {
+                                  errorMsg = 'Sai email hoặc mật khẩu. Vui lòng kiểm tra lại!';
+                                } else if (errorMsg.contains('too-many-requests')) {
+                                  errorMsg = 'Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau!';
+                                } else if (errorMsg.contains('network-request-failed')) {
+                                  errorMsg = 'Lỗi kết nối mạng. Vui lòng kiểm tra lại internet!';
+                                } else if (errorMsg.contains('invalid-email')) {
+                                  errorMsg = 'Định dạng email không hợp lệ!';
+                                }
+
                                 showDialog(
                                   context: context,
                                   builder: (context) => AlertDialog(
@@ -161,7 +172,7 @@ class _LoginPageState extends State<LoginPage> {
                                         Text('Lỗi đăng nhập'),
                                       ],
                                     ),
-                                    content: Text(e.toString().replaceAll('Exception: ', '')),
+                                    content: Text(errorMsg, style: const TextStyle(fontSize: 15)),
                                     actions: [
                                       TextButton(
                                         onPressed: () => Navigator.pop(context), 
