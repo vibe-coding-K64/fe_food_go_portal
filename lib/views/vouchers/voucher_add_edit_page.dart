@@ -20,12 +20,18 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
   final VoucherApiService _apiService = VoucherApiService();
   final AuthService _authService = AuthService();
   final _formKey = GlobalKey<FormState>();
+  
+  final _titleCtrl = TextEditingController();
+  final _subtitleCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   final _valueCtrl = TextEditingController();
+  final _pointsCtrl = TextEditingController();
+  final _imageCtrl = TextEditingController();
+  final _remainingCtrl = TextEditingController();
+  final _termsCtrl = TextEditingController();
   final _minOrderCtrl = TextEditingController();
-  final _limitCtrl = TextEditingController();
+  
   int _discountType = 1; // 1: %, 2: tiền mặt
-  DateTime? _expiryDate;
   bool _isSaving = false;
 
   @override
@@ -33,12 +39,16 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
     super.initState();
     if (widget.isEdit && VoucherFormPage.selectedVoucherToEdit != null) {
       final v = VoucherFormPage.selectedVoucherToEdit!;
+      _titleCtrl.text = v.title;
+      _subtitleCtrl.text = v.subtitle;
       _codeCtrl.text = v.code;
       _discountType = v.type;
       _valueCtrl.text = v.value.toString();
-      _minOrderCtrl.text = v.minOrder.toString();
-      _limitCtrl.text = v.limitCount.toString();
-      _expiryDate = v.expiryDate;
+      _pointsCtrl.text = v.pointsRequired.toString();
+      _imageCtrl.text = v.imageUrl;
+      _remainingCtrl.text = v.remaining.toString();
+      _termsCtrl.text = v.terms;
+      _minOrderCtrl.text = v.minOrderValue.toString();
     }
   }
 
@@ -77,6 +87,8 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
                         const Text('Thông tin Voucher',
                             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2D))),
                         const Divider(height: 24),
+                        _field('Tiêu đề voucher', _titleCtrl, Icons.title, required: true),
+                        _field('Mô tả ngắn gọn', _subtitleCtrl, Icons.description_outlined, required: true),
                         _field('Mã voucher (VD: SAVE20)', _codeCtrl, Icons.local_offer_outlined, required: true, validator: (v) {
                           if (v != null && v.contains(' ')) return 'Mã không được chứa khoảng trắng';
                           return null;
@@ -115,34 +127,22 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
                               if (v != null && v.isNotEmpty && double.tryParse(v) == null) return 'Phải là số hợp lệ';
                               return null;
                             }),
-                        _field('Giới hạn lượt dùng', _limitCtrl, Icons.numbers_outlined,
+                        _field('Số lượng voucher', _remainingCtrl, Icons.numbers_outlined,
                             required: true,
                             keyboardType: TextInputType.number,
                             validator: (v) {
                               if (v != null && v.isNotEmpty && int.tryParse(v) == null) return 'Phải là số nguyên hợp lệ';
                               return null;
                             }),
-                        const SizedBox(height: 4),
-                        // Date picker
-                        InkWell(
-                          onTap: _pickDate,
-                          child: InputDecorator(
-                            decoration: InputDecoration(
-                              labelText: 'Ngày hết hạn',
-                              prefixIcon: const Icon(Icons.event_outlined, color: Color(0xFFFF6B35), size: 20),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                              filled: true,
-                              fillColor: const Color(0xFFF9F9F9),
-                            ),
-                            child: Text(
-                              _expiryDate == null
-                                  ? 'Chọn ngày hết hạn'
-                                  : '${_expiryDate!.day.toString().padLeft(2, '0')}/${_expiryDate!.month.toString().padLeft(2, '0')}/${_expiryDate!.year}',
-                              style: TextStyle(
-                                  color: _expiryDate == null ? Colors.grey : const Color(0xFF1E1E2D)),
-                            ),
-                          ),
-                        ),
+                        _field('Số điểm cần đổi', _pointsCtrl, Icons.stars_outlined,
+                            required: true,
+                            keyboardType: TextInputType.number,
+                            validator: (v) {
+                              if (v != null && v.isNotEmpty && int.tryParse(v) == null) return 'Phải là số nguyên hợp lệ';
+                              return null;
+                            }),
+                        _field('Đường dẫn ảnh voucher (Tùy chọn)', _imageCtrl, Icons.image_outlined, required: false),
+                        _field('Điều khoản sử dụng (Tùy chọn)', _termsCtrl, Icons.gavel_outlined, required: false, maxLines: 3),
                       ],
                     ),
                   ),
@@ -223,12 +223,13 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
   }
 
   Widget _field(String label, TextEditingController ctrl, IconData icon,
-      {bool required = false, TextInputType? keyboardType, String? Function(String?)? validator}) {
+      {bool required = false, int maxLines = 1, TextInputType? keyboardType, String? Function(String?)? validator}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: TextFormField(
         controller: ctrl,
         keyboardType: keyboardType,
+        maxLines: maxLines,
         validator: (v) {
           if (required && (v == null || v.trim().isEmpty)) {
             return 'Vui lòng nhập $label';
@@ -240,7 +241,7 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
         },
         decoration: InputDecoration(
           labelText: label,
-          prefixIcon: Icon(icon, color: const Color(0xFFFF6B35), size: 20),
+          prefixIcon: maxLines == 1 ? Icon(icon, color: const Color(0xFFFF6B35), size: 20) : null,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFFF6B35))),
           filled: true,
@@ -274,6 +275,10 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
               children: [
                 const Text('🎟 VOUCHER', style: TextStyle(color: Colors.white70, fontSize: 11)),
                 const SizedBox(height: 4),
+                Text(
+                  _titleCtrl.text.isEmpty ? 'Tiêu đề' : _titleCtrl.text,
+                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                ),
                 Text(
                   _codeCtrl.text.isEmpty ? 'MYVOUCHER' : _codeCtrl.text.toUpperCase(),
                   style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 2),
@@ -312,30 +317,11 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
             ],
           ),
           SizedBox(height: 8),
-          Text('• Mã ngắn gọn dễ nhớ (VD: SAVE20)\n• Đặt giới hạn lượt để kiểm soát chi phí\n• Mã hoa không dấu để tránh nhầm lẫn',
+          Text('• Mã ngắn gọn dễ nhớ (VD: SAVE20)\n• Điền số lượng còn lại để kiểm soát số lượng\n• Mã hoa không dấu để tránh nhầm lẫn',
               style: TextStyle(color: Colors.blue, fontSize: 12, height: 1.8)),
         ],
       ),
     );
-  }
-
-  Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final first = today.add(const Duration(days: 1)); // Bắt đầu từ ngày mai (00:00:00)
-    
-    DateTime initDate = _expiryDate ?? today.add(const Duration(days: 30));
-    if (initDate.isBefore(first)) {
-      initDate = first;
-    }
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initDate,
-      firstDate: first,
-      lastDate: today.add(const Duration(days: 365 * 2)),
-    );
-    if (picked != null) setState(() => _expiryDate = picked);
   }
 
   void _showNotificationDialog(BuildContext context, String message, bool isSuccess) {
@@ -393,18 +379,6 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
 
   Future<void> _save() async {
     if (_formKey.currentState!.validate()) {
-      if (_expiryDate == null) {
-        _showNotificationDialog(context, 'Vui lòng chọn ngày hết hạn', false);
-        return;
-      }
-      
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      if (_expiryDate!.isBefore(today.add(const Duration(days: 1)))) {
-        _showNotificationDialog(context, 'Ngày hết hạn phải lớn hơn ngày hiện tại', false);
-        return;
-      }
-      
       setState(() => _isSaving = true);
       
       try {
@@ -413,14 +387,16 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
 
         final newVoucher = Voucher(
           storeId: storeId,
+          title: _titleCtrl.text.trim(),
+          subtitle: _subtitleCtrl.text.trim(),
           code: _codeCtrl.text.trim().toUpperCase(),
           type: _discountType,
           value: double.parse(_valueCtrl.text.trim()),
-          minOrder: double.parse(_minOrderCtrl.text.trim()),
-          limitCount: int.parse(_limitCtrl.text.trim()),
-          usedCount: 0,
-          expiryDate: _expiryDate!,
-          isActive: true,
+          pointsRequired: int.parse(_pointsCtrl.text.trim()),
+          imageUrl: _imageCtrl.text.trim(),
+          remaining: int.parse(_remainingCtrl.text.trim()),
+          terms: _termsCtrl.text.trim(),
+          minOrderValue: double.parse(_minOrderCtrl.text.trim()),
         );
 
         if (widget.isEdit && VoucherFormPage.selectedVoucherToEdit != null) {

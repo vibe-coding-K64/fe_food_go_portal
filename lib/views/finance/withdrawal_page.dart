@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../data/models/wallet_model.dart';
+import '../../data/models/transaction_model.dart';
+import '../../data/services/wallet_api_service.dart';
 
 class WithdrawalPage extends StatefulWidget {
   const WithdrawalPage({super.key});
@@ -9,15 +13,44 @@ class WithdrawalPage extends StatefulWidget {
 
 class _WithdrawalPageState extends State<WithdrawalPage> {
   final _amountCtrl = TextEditingController();
-  final double _balance = 12450000;
-  final List<Map<String, dynamic>> _history = [
-    {'amount': 5000000, 'bank': 'Vietcombank', 'account': '0123...8901', 'status': 'Đã duyệt', 'date': '15/05/2025'},
-    {'amount': 3000000, 'bank': 'Vietcombank', 'account': '0123...8901', 'status': 'Đang xử lý', 'date': '18/05/2025'},
-    {'amount': 2000000, 'bank': 'Vietcombank', 'account': '0123...8901', 'status': 'Từ chối', 'date': '10/05/2025'},
-  ];
+  final WalletApiService _apiService = WalletApiService();
+  final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
+
+  Wallet? _wallet;
+  List<Transaction> _history = [];
+  bool _isLoading = true;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    try {
+      final wallet = await _apiService.getWallet();
+      final allTrans = await _apiService.getTransactions(page: 0, size: 50);
+      final withdrawals = allTrans.where((t) => t.type == 'withdrawal').toList();
+      setState(() {
+        _wallet = wallet;
+        _history = withdrawals;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35)));
+    }
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -74,7 +107,7 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
                   children: [
                     const Text('Số dư khả dụng', style: TextStyle(color: Colors.grey, fontSize: 12)),
                     Text(
-                      '${_balance.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}đ',
+                      _currencyFormat.format(_wallet?.balance ?? 0),
                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFFFF6B35)),
                     ),
                   ],
@@ -139,9 +172,11 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _requestWithdrawal,
-              icon: const Icon(Icons.send_outlined, size: 18),
-              label: const Text('Gửi yêu cầu rút tiền'),
+              onPressed: _isSubmitting ? null : _requestWithdrawal,
+              icon: _isSubmitting ? const SizedBox() : const Icon(Icons.send_outlined, size: 18),
+              label: _isSubmitting 
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                  : const Text('Gửi yêu cầu rút tiền'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFF6B35),
                 foregroundColor: Colors.white,
@@ -174,14 +209,25 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
     );
   }
 
-  Widget _buildHistoryRow(Map<String, dynamic> h) {
+  Widget _buildHistoryRow(Transaction h) {
     Color statusColor;
-    switch (h['status']) {
-      case 'Đã duyệt': statusColor = Colors.green; break;
-      case 'Đang xử lý': statusColor = Colors.orange; break;
-      default: statusColor = Colors.red;
+    String statusText;
+    switch (h.status) {
+      case 'completed': 
+        statusColor = Colors.green; 
+        statusText = 'Đã duyệt';
+        break;
+      case 'pending': 
+        statusColor = Colors.orange; 
+        statusText = 'Đang xử lý';
+        break;
+      default: 
+        statusColor = Colors.red;
+        statusText = 'Từ chối';
     }
-    final amt = h['amount'] as int;
+    
+    final dateStr = h.createdAt != null ? DateFormat('dd/MM/yyyy HH:mm').format(h.createdAt!) : '';
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Container(
@@ -204,8 +250,8 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${h['bank']} - ${h['account']}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                  Text(h['date'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  const Text('Vietcombank - NGUYEN VAN A', style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(dateStr, style: const TextStyle(color: Colors.grey, fontSize: 12)),
                 ],
               ),
             ),
@@ -213,7 +259,7 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '-${amt.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}đ',
+                  '-${_currencyFormat.format(h.amount)}',
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1E1E2D)),
                 ),
                 const SizedBox(height: 4),
@@ -223,7 +269,7 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
                     color: statusColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(h['status'],
+                  child: Text(statusText,
                       style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold)),
                 ),
               ],
@@ -234,11 +280,47 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
     );
   }
 
-  void _requestWithdrawal() {
-    if (_amountCtrl.text.isEmpty) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Gửi yêu cầu rút tiền thành công!'), backgroundColor: Colors.green),
-    );
-    _amountCtrl.clear();
+  Future<void> _requestWithdrawal() async {
+    final amountText = _amountCtrl.text.replaceAll('.', '').replaceAll(',', '');
+    final amount = double.tryParse(amountText);
+    
+    if (amount == null || amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vui lòng nhập số tiền hợp lệ'), backgroundColor: Colors.red));
+      return;
+    }
+    
+    if (_wallet != null && amount > _wallet!.balance) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Số dư không đủ'), backgroundColor: Colors.red));
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final tx = await _apiService.requestWithdraw(amount);
+      setState(() {
+        _amountCtrl.clear();
+        _isSubmitting = false;
+        _history.insert(0, tx);
+        _wallet = Wallet(
+          id: _wallet!.id,
+          userId: _wallet!.userId,
+          role: _wallet!.role,
+          balance: _wallet!.balance - amount,
+          totalEarned: _wallet!.totalEarned,
+          totalWithdrawn: _wallet!.totalWithdrawn,
+          pendingBalance: _wallet!.pendingBalance + amount,
+          createdAt: _wallet!.createdAt,
+          updatedAt: DateTime.now()
+        );
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gửi yêu cầu rút tiền thành công!'), backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      setState(() => _isSubmitting = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
+      }
+    }
   }
 }

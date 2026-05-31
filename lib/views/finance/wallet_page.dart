@@ -1,11 +1,61 @@
 import 'package:flutter/material.dart';
 
-class WalletPage extends StatelessWidget {
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import '../../data/models/wallet_model.dart';
+import '../../data/models/transaction_model.dart';
+import '../../data/services/wallet_api_service.dart';
+
+class WalletPage extends StatefulWidget {
   final Function(String)? onNavigate;
   const WalletPage({super.key, this.onNavigate});
 
   @override
+  State<WalletPage> createState() => _WalletPageState();
+}
+
+class _WalletPageState extends State<WalletPage> {
+  final WalletApiService _apiService = WalletApiService();
+  Wallet? _wallet;
+  List<Transaction> _transactions = [];
+  bool _isLoading = true;
+
+  final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchData();
+  }
+
+  Future<void> _fetchData() async {
+    try {
+      final wallet = await _apiService.getWallet();
+      final transactions = await _apiService.getTransactions(page: 0, size: 5);
+      setState(() {
+        _wallet = wallet;
+        _transactions = transactions;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35)));
+    }
+
+    final balance = _wallet?.balance ?? 0.0;
+    final totalEarned = _wallet?.totalEarned ?? 0.0;
+    final pendingBalance = _wallet?.pendingBalance ?? 0.0;
+    final totalWithdrawn = _wallet?.totalWithdrawn ?? 0.0;
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -30,17 +80,17 @@ class WalletPage extends StatelessWidget {
               children: [
                 const Text('Tổng số dư khả dụng', style: TextStyle(color: Colors.white70, fontSize: 14)),
                 const SizedBox(height: 8),
-                const Text('12.450.000đ', style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold)),
+                Text(_currencyFormat.format(balance), style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 20),
                 Row(
                   children: [
-                    _walletStat('Tháng này', '+3.200.000đ', Icons.trending_up),
+                    _walletStat('Tổng thu nhập', _currencyFormat.format(totalEarned), Icons.trending_up),
                     const SizedBox(width: 32),
-                    _walletStat('Đang chờ', '850.000đ', Icons.hourglass_empty_outlined),
+                    _walletStat('Đang chờ', _currencyFormat.format(pendingBalance), Icons.hourglass_empty_outlined),
                     const Spacer(),
                     ElevatedButton.icon(
                       onPressed: () {
-                        if (onNavigate != null) onNavigate!('/finance/withdrawal');
+                        if (widget.onNavigate != null) widget.onNavigate!('/finance/withdrawal');
                       },
                       icon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
                       label: const Text('Rút tiền'),
@@ -60,11 +110,7 @@ class WalletPage extends StatelessWidget {
           // Quick stats
           Row(
             children: [
-              Expanded(child: _statCard('Doanh thu hôm nay', '1.250.000đ', Icons.today_outlined, Colors.blue)),
-              const SizedBox(width: 16),
-              Expanded(child: _statCard('Đơn hoàn thành', '14', Icons.check_circle_outline, Colors.green)),
-              const SizedBox(width: 16),
-              Expanded(child: _statCard('Rút gần nhất', '5.000.000đ', Icons.arrow_upward_outlined, Colors.purple)),
+              Expanded(child: _statCard('Đã rút', _currencyFormat.format(totalWithdrawn), Icons.arrow_upward_outlined, Colors.purple)),
             ],
           ),
           const SizedBox(height: 24),
@@ -85,19 +131,20 @@ class WalletPage extends StatelessWidget {
                     const Text('Giao dịch gần đây', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2D))),
                     TextButton(
                       onPressed: () {
-                        if (onNavigate != null) onNavigate!('/finance/transactions');
+                        if (widget.onNavigate != null) widget.onNavigate!('/finance/transactions');
                       },
                       child: const Text('Xem tất cả', style: TextStyle(color: Color(0xFFFF6B35))),
                     ),
                   ],
                 ),
                 const Divider(height: 20),
-                ...[
-                  {'type': 'credit', 'desc': 'Đơn hàng #OD-001 hoàn thành', 'amount': '+89.000đ', 'time': '14:23 hôm nay'},
-                  {'type': 'credit', 'desc': 'Đơn hàng #OD-002 hoàn thành', 'amount': '+130.000đ', 'time': '13:40 hôm nay'},
-                  {'type': 'debit', 'desc': 'Rút tiền về Vietcombank', 'amount': '-2.000.000đ', 'time': '10:00 hôm nay'},
-                  {'type': 'credit', 'desc': 'Đơn hàng #OD-003 hoàn thành', 'amount': '+215.000đ', 'time': 'Hôm qua'},
-                ].map((tx) => _transactionRow(tx)).toList(),
+                if (_transactions.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Center(child: Text('Chưa có giao dịch nào', style: TextStyle(color: Colors.grey))),
+                  )
+                else
+                  ..._transactions.map((tx) => _transactionRow(tx)).toList(),
               ],
             ),
           ),
@@ -154,8 +201,12 @@ class WalletPage extends StatelessWidget {
     );
   }
 
-  Widget _transactionRow(Map<String, dynamic> tx) {
-    final isCredit = tx['type'] == 'credit';
+  Widget _transactionRow(Transaction tx) {
+    final isCredit = tx.type == 'order_payment' || tx.type == 'delivery_income' || tx.type == 'refund';
+    final sign = isCredit ? '+' : '-';
+    final amountStr = sign + _currencyFormat.format(tx.netAmount);
+    final timeStr = tx.createdAt != null ? DateFormat('HH:mm dd/MM').format(tx.createdAt!) : '';
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Row(
@@ -175,12 +226,12 @@ class WalletPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(tx['desc'], style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
-                Text(tx['time'], style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                Text(tx.description, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13)),
+                Text(timeStr, style: const TextStyle(color: Colors.grey, fontSize: 11)),
               ],
             ),
           ),
-          Text(tx['amount'],
+          Text(amountStr,
               style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: isCredit ? Colors.green : Colors.red,
