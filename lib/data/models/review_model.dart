@@ -2,6 +2,8 @@ class Review {
   final String? id;
   final String storeId;
   final String orderId;
+  final String? orderCode;
+  final String? orderItems;
   final String customerId;
   final String customerName;
   final double rating;
@@ -14,6 +16,8 @@ class Review {
     this.id,
     required this.storeId,
     required this.orderId,
+    this.orderCode,
+    this.orderItems,
     required this.customerId,
     required this.customerName,
     required this.rating,
@@ -28,6 +32,8 @@ class Review {
       id: json['id'],
       storeId: json['storeId'] ?? '',
       orderId: json['orderId'] ?? '',
+      orderCode: json['orderCode'],
+      orderItems: json['orderItems'],
       customerId: json['userId'] ?? json['customerId'] ?? '',
       customerName: json['userName'] ?? json['customerName'] ?? '',
       rating: (json['starRating'] ?? json['rating'] ?? 0).toDouble(),

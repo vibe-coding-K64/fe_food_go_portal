@@ -22,6 +22,10 @@ class _ReviewsPageState extends State<ReviewsPage> {
   final AuthService _authService = AuthService();
   String? _currentStoreId;
   Store? _currentStore;
+  
+  String? _replyingReviewId;
+  final TextEditingController _replyController = TextEditingController();
+  bool _isSubmittingReply = false;
 
   @override
   void initState() {
@@ -93,7 +97,10 @@ class _ReviewsPageState extends State<ReviewsPage> {
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: ChoiceChip(
-                  label: Text(star == 0 ? 'Tất cả' : '★ $star'),
+                  label: Text(
+                    star == 0 ? 'Tất cả' : '★' * star,
+                    style: star == 0 ? null : TextStyle(color: isSelected ? Colors.white : Colors.amber, fontSize: 16),
+                  ),
                   selected: isSelected,
                   onSelected: (_) => setState(() => _filterStar = star),
                   selectedColor: const Color(0xFFFF6B35),
@@ -192,7 +199,7 @@ class _ReviewsPageState extends State<ReviewsPage> {
   Widget _buildReviewCard(int index, Review review) {
     bool hasReplied = review.merchantReply != null && review.merchantReply!.isNotEmpty;
     String dateStr = review.createdAt != null 
-        ? DateFormat('dd/MM/yyyy HH:mm').format(review.createdAt!) 
+        ? DateFormat('HH:mm dd/MM/yyyy').format(review.createdAt!.toLocal()) 
         : 'Không rõ';
 
     return Container(
@@ -221,15 +228,25 @@ class _ReviewsPageState extends State<ReviewsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(review.customerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    Text(dateStr, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    if (review.orderCode != null)
+                      Text('Mã đơn hàng: ${review.orderCode}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    if (review.orderItems != null)
+                      Text('Món: ${review.orderItems}', style: const TextStyle(color: Colors.grey, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
                   ],
                 ),
               ),
-              Row(
-                children: List.generate(5, (i) => Icon(
-                  i < review.rating.round() ? Icons.star : Icons.star_outline,
-                  color: Colors.amber, size: 16,
-                )),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Row(
+                    children: List.generate(5, (i) => Icon(
+                      i < review.rating.round() ? Icons.star : Icons.star_outline,
+                      color: Colors.amber, size: 16,
+                    )),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(dateStr, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                ],
               ),
               if (hasReplied)
                 Container(
@@ -271,7 +288,7 @@ class _ReviewsPageState extends State<ReviewsPage> {
                       Text(_currentStore?.name ?? 'Cửa hàng FoodGo', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFE65100))),
                       const Spacer(),
                       if (review.repliedAt != null)
-                        Text(DateFormat('dd/MM/yyyy HH:mm').format(review.repliedAt!.toLocal()), style: const TextStyle(color: Colors.black45, fontSize: 11)),
+                        Text(DateFormat('HH:mm dd/MM/yyyy').format(review.repliedAt!.toLocal()), style: const TextStyle(color: Colors.black45, fontSize: 11)),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -282,87 +299,115 @@ class _ReviewsPageState extends State<ReviewsPage> {
           ],
           const SizedBox(height: 12),
           if (!hasReplied && review.id != null)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: () => _showReplyDialog(context, index, review),
-                  icon: const Icon(Icons.reply_outlined, size: 16),
-                  label: const Text('Phản hồi'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF6B35),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
+            if (_replyingReviewId == review.id)
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F9FA),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
                 ),
-              ],
-            ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    TextField(
+                      controller: _replyController,
+                      maxLines: 3,
+                      autofocus: true,
+                      enabled: !_isSubmittingReply,
+                      decoration: InputDecoration(
+                        hintText: 'Nhập phản hồi của bạn...',
+                        hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.all(12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFFF6B35))),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: _isSubmittingReply ? null : () {
+                            setState(() {
+                              _replyingReviewId = null;
+                              _replyController.clear();
+                            });
+                          },
+                          style: TextButton.styleFrom(foregroundColor: Colors.grey.shade700),
+                          child: const Text('Hủy'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: _isSubmittingReply ? null : () => _submitReply(index, review),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFF6B35),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: 0,
+                          ),
+                          child: _isSubmittingReply 
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) 
+                              : const Text('Gửi'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              )
+            else
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _replyingReviewId = review.id;
+                        _replyController.clear();
+                      });
+                    },
+                    icon: const Icon(Icons.reply_outlined, size: 16),
+                    label: const Text('Phản hồi'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFFFF6B35),
+                      elevation: 0,
+                      side: const BorderSide(color: Color(0xFFFF6B35)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ],
+              ),
         ],
       ),
     );
   }
 
-  void _showReplyDialog(BuildContext context, int index, Review review) {
-    final ctrl = TextEditingController();
-    bool isSubmitting = false;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Phản hồi đánh giá'),
-            content: SizedBox(
-              width: 400,
-              child: TextFormField(
-                controller: ctrl,
-                maxLines: 4,
-                autofocus: true,
-                enabled: !isSubmitting,
-                decoration: InputDecoration(
-                  hintText: 'Cảm ơn bạn đã ủng hộ quán...',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFFF6B35))),
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: isSubmitting ? null : () => Navigator.pop(ctx), 
-                child: const Text('Hủy')
-              ),
-              ElevatedButton(
-                onPressed: isSubmitting ? null : () async {
-                  if (ctrl.text.trim().isEmpty) return;
-                  setDialogState(() => isSubmitting = true);
-                  try {
-                    final updatedReview = await _apiService.replyReview(review.id!, ctrl.text.trim());
-                    setState(() {
-                      int targetIndex = _reviews.indexWhere((r) => r.id == review.id);
-                      if (targetIndex != -1) {
-                        _reviews[targetIndex] = updatedReview;
-                      }
-                    });
-                    if (ctx.mounted) Navigator.pop(ctx);
-                  } catch (e) {
-                    setDialogState(() => isSubmitting = false);
-                    if (ctx.mounted) {
-                      _showNotification(ctx, e.toString(), false);
-                    }
-                  }
-                },
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B35), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                child: isSubmitting ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Gửi phản hồi'),
-              ),
-            ],
-          );
+  Future<void> _submitReply(int index, Review review) async {
+    if (_replyController.text.trim().isEmpty) return;
+    setState(() => _isSubmittingReply = true);
+    try {
+      final updatedReview = await _apiService.replyReview(review.id!, _replyController.text.trim());
+      setState(() {
+        int targetIndex = _reviews.indexWhere((r) => r.id == review.id);
+        if (targetIndex != -1) {
+          _reviews[targetIndex] = updatedReview;
         }
-      ),
-    );
+        _replyingReviewId = null;
+        _replyController.clear();
+        _isSubmittingReply = false;
+      });
+    } catch (e) {
+      setState(() => _isSubmittingReply = false);
+      if (mounted) {
+        _showNotification(context, e.toString(), false);
+      }
+    }
   }
 
   void _showNotification(BuildContext context, String message, bool isSuccess) {

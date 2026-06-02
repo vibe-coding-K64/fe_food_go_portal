@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../data/models/order_model.dart';
@@ -17,31 +18,54 @@ class _OrdersPageState extends State<OrdersPage> {
   final OrderApiService _apiService = OrderApiService();
   final AuthService _authService = AuthService();
   String _filterStatus = 'Tất cả';
-  final List<String> _statuses = ['Tất cả', 'Chờ xác nhận', 'Đang chế biến', 'Đang giao', 'Hoàn thành', 'Đã hủy'];
+  final List<String> _statuses = ['Tất cả', 'Chờ xác nhận', 'Đang chuẩn bị', 'Đang giao', 'Hoàn thành', 'Đã hủy'];
   int _currentPage = 1;
   final int _itemsPerPage = 10;
 
   List<Order> _orders = [];
   bool _isLoading = true;
+  Timer? _pollingTimer;
 
   @override
   void initState() {
     super.initState();
     _fetchOrders();
+    _startPolling();
   }
 
-  Future<void> _fetchOrders() async {
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) _fetchOrders(isPolling: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _fetchOrders({bool isPolling = false}) async {
+    if (!isPolling && mounted) setState(() => _isLoading = true);
     try {
       final storeId = await _authService.getStoreId();
       if (storeId == null) throw 'Không tìm thấy thông tin cửa hàng';
       final orders = await _apiService.getOrdersByStoreId(storeId);
-      setState(() {
-        _orders = orders;
-        _isLoading = false;
+      orders.sort((a, b) {
+        if (a.createdAt == null && b.createdAt == null) return 0;
+        if (a.createdAt == null) return 1;
+        if (b.createdAt == null) return -1;
+        return b.createdAt!.compareTo(a.createdAt!);
       });
-    } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
+        setState(() {
+          _orders = orders;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+      if (mounted && !isPolling) {
         _showNotificationDialog(context, 'Lỗi tải đơn hàng: $e', false);
       }
     }
@@ -54,6 +78,16 @@ class _OrdersPageState extends State<OrdersPage> {
       if (mounted) _showNotificationDialog(context, 'Đã cập nhật trạng thái thành "$newStatus"', true);
     } catch (e) {
       if (mounted) _showNotificationDialog(context, 'Lỗi: $e', false);
+    }
+  }
+
+  Future<void> _confirmOrder(String orderId) async {
+    try {
+      await _apiService.confirmOrder(orderId);
+      _fetchOrders();
+      if (mounted) _showNotificationDialog(context, 'Đã xác nhận đơn hàng thành công!', true);
+    } catch (e) {
+      if (mounted) _showNotificationDialog(context, 'Lỗi xác nhận: $e', false);
     }
   }
 
@@ -145,19 +179,31 @@ class _OrdersPageState extends State<OrdersPage> {
           child: Row(
             children: _statuses.map((s) {
               final isSelected = _filterStatus == s;
+              final color = s == 'Tất cả' ? const Color(0xFFFF6B35) : _statusColor(s);
+              
               return Padding(
                 padding: const EdgeInsets.only(right: 8),
                 child: ChoiceChip(
+                  showCheckmark: false,
                   label: Text(s),
                   selected: isSelected,
                   onSelected: (_) => _setFilter(s),
-                  selectedColor: _statusColor(s),
-                  labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.grey.shade700, fontWeight: FontWeight.w500),
-                  backgroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    side: BorderSide(color: isSelected ? _statusColor(s) : Colors.grey.shade300),
+                  selectedColor: color,
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : color, 
+                    fontWeight: FontWeight.bold,
                   ),
+                  backgroundColor: color.withOpacity(0.1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                    side: BorderSide(
+                      color: isSelected ? color : color.withOpacity(0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  elevation: 0,
+                  pressElevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 ),
               );
             }).toList(),
@@ -173,35 +219,16 @@ class _OrdersPageState extends State<OrdersPage> {
             ),
             child: Column(
               children: [
-                // Header
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8F9FA),
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                    border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-                  ),
-                  child: const Row(
-                    children: [
-                      SizedBox(width: 110, child: Text('Mã đơn', style: TextStyle(fontWeight: FontWeight.bold))),
-                      Expanded(child: Text('Khách hàng', style: TextStyle(fontWeight: FontWeight.bold))),
-                      SizedBox(width: 80, child: Text('Số món', style: TextStyle(fontWeight: FontWeight.bold))),
-                      SizedBox(width: 120, child: Text('Tổng tiền', style: TextStyle(fontWeight: FontWeight.bold))),
-                      SizedBox(width: 60, child: Text('Giờ', style: TextStyle(fontWeight: FontWeight.bold))),
-                      SizedBox(width: 140, child: Text('Trạng thái', style: TextStyle(fontWeight: FontWeight.bold))),
-                      SizedBox(width: 130, child: Text('Thao tác', style: TextStyle(fontWeight: FontWeight.bold))),
-                    ],
-                  ),
-                ),
                 Expanded(
                   child: _isLoading 
                     ? const Center(child: CircularProgressIndicator())
                     : _filtered.isEmpty 
                       ? const Center(child: Text('Không có đơn hàng nào'))
                       : ListView.separated(
+                          padding: const EdgeInsets.all(24),
                           itemCount: _pagedOrders.length,
-                          separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade100),
-                          itemBuilder: (context, i) => _buildOrderRow(_pagedOrders[i]),
+                          separatorBuilder: (_, __) => const SizedBox(height: 16),
+                          itemBuilder: (context, i) => _buildOrderCard(_pagedOrders[i]),
                         ),
                 ),
                 if (!_isLoading && _filtered.isNotEmpty)
@@ -214,10 +241,11 @@ class _OrdersPageState extends State<OrdersPage> {
     );
   }
 
-  Widget _buildOrderRow(Order order) {
-    String timeStr = '--:--';
+  Widget _buildOrderCard(Order order) {
+    String timeStr = 'Thời gian đặt: --:--';
     if (order.createdAt != null) {
-      timeStr = '${order.createdAt!.hour.toString().padLeft(2, '0')}:${order.createdAt!.minute.toString().padLeft(2, '0')}';
+      final localTime = order.createdAt!.toLocal();
+      timeStr = 'Thời gian đặt:\n${localTime.hour.toString().padLeft(2, '0')}:${localTime.minute.toString().padLeft(2, '0')} - ${localTime.day.toString().padLeft(2, '0')}/${localTime.month.toString().padLeft(2, '0')}/${localTime.year}';
     }
 
     return InkWell(
@@ -225,105 +253,121 @@ class _OrdersPageState extends State<OrdersPage> {
         OrderDetailPage.currentOrder = order;
         if (widget.onNavigate != null) widget.onNavigate!('/orders/detail');
       },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2))
+          ],
+        ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            // 1. Order Code
             SizedBox(
-              width: 110,
-              child: Text(order.code,
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFFF6B35))),
-            ),
-            Expanded(
-              child: Row(
+              width: 150,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: const Color(0xFFFFF3E0),
-                    child: Text(
-                      order.customerName.isNotEmpty ? order.customerName[0].toUpperCase() : '?',
-                      style: const TextStyle(color: Color(0xFFFF6B35), fontWeight: FontWeight.bold, fontSize: 13),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(order.customerName, style: const TextStyle(fontWeight: FontWeight.w500)),
+                  Text('Mã đơn: ${order.code}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFFFF6B35))),
+                  const SizedBox(height: 4),
+                  Text(timeStr, style: const TextStyle(color: Colors.grey, fontSize: 13)),
                 ],
               ),
             ),
-            SizedBox(width: 80, child: Text('${order.items.length} món', style: const TextStyle(color: Colors.grey))),
-            SizedBox(
-              width: 120,
-              child: Text(
-                '${order.totalAmount.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}đ',
-                style: const TextStyle(fontWeight: FontWeight.bold),
+            
+            // 2. Customer Info
+            Expanded(
+              flex: 2,
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: const Color(0xFFFFF3E0),
+                    child: Text(
+                      order.receiverName.isNotEmpty ? order.receiverName[0].toUpperCase() : '?',
+                      style: const TextStyle(color: Color(0xFFFF6B35), fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(order.receiverName.isNotEmpty ? order.receiverName : 'Khách lạ',
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 4),
+                        Text('${order.items.length} món',
+                            style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            SizedBox(width: 60, child: Text(timeStr, style: const TextStyle(color: Colors.grey))),
+
+            // 3. Total Amount
+            Expanded(
+              flex: 1,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('Tổng tiền', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${order.totalAmount.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}đ',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+                  ),
+                ],
+              ),
+            ),
+
+            // 4. Status Badge
             SizedBox(
-              width: 140,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: _statusColor(order.status).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  order.status,
-                  style: TextStyle(color: _statusColor(order.status), fontSize: 12, fontWeight: FontWeight.w600),
-                  textAlign: TextAlign.center,
+              width: 130,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _statusColor(order.status).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    order.status,
+                    style: TextStyle(color: _statusColor(order.status), fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
             ),
+
+            // 5. Actions
             SizedBox(
               width: 130,
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   if (order.status == 'Chờ xác nhận') ...[
-                    IconButton(
-                      onPressed: () => _updateStatus(order.id!, 'Đang chế biến'),
-                      icon: const Icon(Icons.check_circle_outline, color: Colors.green, size: 20),
-                      tooltip: 'Xác nhận',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                    const SizedBox(width: 12),
-                    IconButton(
-                      onPressed: () => _updateStatus(order.id!, 'Đã hủy'),
-                      icon: const Icon(Icons.cancel_outlined, color: Colors.red, size: 20),
-                      tooltip: 'Từ chối',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                    const SizedBox(width: 12),
-                  ] else if (order.status == 'Đang chế biến') ...[
-                    IconButton(
-                      onPressed: () => _updateStatus(order.id!, 'Đang giao'),
-                      icon: const Icon(Icons.local_shipping_outlined, color: Colors.blue, size: 20),
-                      tooltip: 'Giao cho tài xế',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                    const SizedBox(width: 12),
+                    _actionBtn(Icons.cancel_outlined, 'Từ chối', Colors.red, () => _updateStatus(order.id!, 'Đã hủy')),
+                    const SizedBox(width: 8),
+                    _actionBtn(Icons.check_circle_outline, 'Xác nhận', Colors.green, () => _confirmOrder(order.id!)),
+                  ] else if (order.status == 'Đang chuẩn bị') ...[
+                    _actionBtn(Icons.local_shipping_outlined, 'Giao xe', Colors.blue, () => _updateStatus(order.id!, 'Đang giao')),
                   ] else if (order.status == 'Đang giao') ...[
-                    IconButton(
-                      onPressed: () => _updateStatus(order.id!, 'Hoàn thành'),
-                      icon: const Icon(Icons.check_circle, color: Colors.purple, size: 20),
-                      tooltip: 'Hoàn thành',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                    const SizedBox(width: 12),
+                    _actionBtn(Icons.check_circle, 'Hoàn thành', Colors.purple, () => _updateStatus(order.id!, 'Hoàn thành')),
                   ],
-                  IconButton(
-                    onPressed: () {
-                      OrderDetailPage.currentOrder = order;
-                      if (widget.onNavigate != null) widget.onNavigate!('/orders/detail');
-                    },
-                    icon: const Icon(Icons.visibility_outlined, color: Color(0xFFFF6B35), size: 20),
-                    tooltip: 'Xem chi tiết',
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
+                  const SizedBox(width: 8),
+                  _actionBtn(Icons.visibility_outlined, 'Chi tiết', const Color(0xFFFF6B35), () {
+                    OrderDetailPage.currentOrder = order;
+                    if (widget.onNavigate != null) widget.onNavigate!('/orders/detail');
+                  }),
                 ],
               ),
             ),
@@ -333,10 +377,25 @@ class _OrdersPageState extends State<OrdersPage> {
     );
   }
 
+  Widget _actionBtn(IconData icon, String tooltip, Color color, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: color, size: 20),
+      ),
+    );
+  }
+
   Color _statusColor(String status) {
     switch (status) {
       case 'Chờ xác nhận': return Colors.orange;
-      case 'Đang chế biến': return Colors.blue;
+      case 'Đang chuẩn bị': return Colors.blue;
       case 'Đang giao': return Colors.purple;
       case 'Hoàn thành': return Colors.green;
       case 'Đã hủy': return Colors.red;

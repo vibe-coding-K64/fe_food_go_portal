@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'auth_service.dart';
 import '../models/order_model.dart';
 import 'api_constants.dart';
 
@@ -10,11 +10,9 @@ class OrderApiService {
     receiveTimeout: const Duration(seconds: 10),
   ))..interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          final token = await user.getIdToken();
+        final token = await AuthService().getToken();
+        if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
-          options.headers['X-Firebase-Token'] = token;
         }
         return handler.next(options);
       },
@@ -39,11 +37,27 @@ class OrderApiService {
     }
   }
 
-  Future<void> updateOrderStatus(String id, String status) async {
+  Future<void> updateOrderStatus(String id, String statusString) async {
     try {
-      await _dio.patch('/orders/$id/status', data: {'status': status});
+      String statusCode = statusString;
+      switch (statusString) {
+        case 'Chờ xác nhận': statusCode = '0'; break;
+        case 'Đang chuẩn bị': statusCode = '1'; break;
+        case 'Đang giao': statusCode = '2'; break;
+        case 'Hoàn thành': statusCode = '3'; break;
+        case 'Đã hủy': statusCode = '4'; break;
+      }
+      await _dio.put('/orders/$id/status', data: {'status': statusCode});
     } catch (e) {
       throw Exception('Failed to update order status: $e');
+    }
+  }
+
+  Future<void> confirmOrder(String orderId) async {
+    try {
+      await _dio.post('/stores/orders/$orderId/confirm');
+    } catch (e) {
+      throw Exception('Failed to confirm order: $e');
     }
   }
 }

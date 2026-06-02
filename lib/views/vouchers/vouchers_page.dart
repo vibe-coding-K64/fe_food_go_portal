@@ -180,20 +180,26 @@ class _VouchersPageState extends State<VouchersPage> {
           // Info
           Expanded(
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // Phần thông tin chính bên trái
                 Expanded(
                   flex: 5,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(v.code,
                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1, color: Color(0xFF1E1E2D))),
                       const SizedBox(height: 6),
-                      Text(v.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
-                      const SizedBox(height: 4),
-                      Text(v.subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.grey, fontSize: 13, height: 1.4)),
+                      Text(v.name.isEmpty ? 'Khuyến mãi đặc biệt' : v.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87)),
+                      if (v.isFreeship)
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: Colors.green.shade100, borderRadius: BorderRadius.circular(4)),
+                          child: const Text('Freeship', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                        ),
                     ],
                   ),
                 ),
@@ -213,7 +219,7 @@ class _VouchersPageState extends State<VouchersPage> {
                           border: Border.all(color: const Color(0xFFFFD8CD)),
                         ),
                         child: Text(
-                          'Còn lại: ${v.remaining}',
+                          'Sử dụng: ${v.usedCount}/${v.limitCount > 0 ? v.limitCount : "∞"}',
                           style: const TextStyle(fontSize: 13, color: Color(0xFFFF6B35), fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -239,20 +245,55 @@ class _VouchersPageState extends State<VouchersPage> {
           // Actions
           Column(
             children: [
-              IconButton(
-                onPressed: () {
-                  VoucherFormPage.selectedVoucherToEdit = v;
-                  if (widget.onNavigate != null) {
-                    widget.onNavigate!('/vouchers/edit');
+              Switch(
+                value: v.isActive,
+                activeColor: const Color(0xFFFF6B35),
+                onChanged: (val) async {
+                  final updatedVoucher = Voucher(
+                    id: v.id,
+                    storeId: v.storeId,
+                    name: v.name,
+                    code: v.code,
+                    type: v.type,
+                    value: v.value,
+                    pointsRequired: v.pointsRequired,
+                    imageUrl: v.imageUrl,
+                    remaining: v.remaining,
+                    terms: v.terms,
+                    minOrderValue: v.minOrderValue,
+                    limitCount: v.limitCount,
+                    usedCount: v.usedCount,
+                    expiryDate: v.expiryDate,
+                    isActive: val,
+                    isFreeship: v.isFreeship,
+                  );
+                  try {
+                    await _apiService.updateVoucher(v.id!, updatedVoucher);
+                    _fetchVouchers();
+                  } catch (e) {
+                    if (mounted) _showNotificationDialog(context, 'Lỗi cập nhật trạng thái: $e', false);
                   }
                 },
-                icon: const Icon(Icons.edit_outlined, color: Color(0xFFFF6B35)),
-                tooltip: 'Sửa',
               ),
-              IconButton(
-                onPressed: () => _deleteVoucher(v),
-                icon: const Icon(Icons.delete_outline, color: Colors.red),
-                tooltip: 'Xóa',
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    onPressed: () {
+                      VoucherFormPage.selectedVoucherToEdit = v;
+                      if (widget.onNavigate != null) {
+                        widget.onNavigate!('/vouchers/edit');
+                      }
+                    },
+                    icon: const Icon(Icons.edit_outlined, color: Color(0xFFFF6B35)),
+                    tooltip: 'Sửa',
+                  ),
+                  IconButton(
+                    onPressed: () => _deleteVoucher(v),
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    tooltip: 'Xóa',
+                  ),
+                ],
               ),
             ],
           ),

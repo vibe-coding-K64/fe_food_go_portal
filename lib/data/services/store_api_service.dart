@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'auth_service.dart';
 import '../models/store_model.dart';
 import 'api_constants.dart';
 
@@ -10,11 +10,9 @@ class StoreApiService {
     receiveTimeout: const Duration(seconds: 10),
   ))..interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          final token = await user.getIdToken();
+        final token = await AuthService().getToken();
+        if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
-          options.headers['X-Firebase-Token'] = token;
         }
         return handler.next(options);
       },
