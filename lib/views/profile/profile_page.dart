@@ -14,10 +14,12 @@ class _ProfilePageState extends State<ProfilePage> {
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   final _taxCtrl = TextEditingController();
+  final _photoCtrl = TextEditingController();
   
   String? _photoUrl;
   String _avatarInitials = "UA";
   String _fullName = "Cửa hàng";
+  bool _isUploadingImage = false;
 
   @override
   void initState() {
@@ -33,6 +35,7 @@ class _ProfilePageState extends State<ProfilePage> {
         _emailCtrl.text = profile['email'] ?? '';
         _phoneCtrl.text = profile['phoneNumber'] ?? '';
         _taxCtrl.text = profile['taxCode'] ?? '';
+        _photoCtrl.text = profile['photoUrl'] ?? '';
         
         _photoUrl = profile['photoUrl'];
         if (profile['fullName'] != null && profile['fullName']!.isNotEmpty) {
@@ -74,38 +77,40 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   child: Column(
                     children: [
-                      Stack(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(60),
-                            child: _photoUrl != null && _photoUrl!.isNotEmpty
-                                ? Image.network(
-                                    _photoUrl!,
+                      GestureDetector(
+                        onTap: _showUpdatePhotoDialog,
+                        child: Stack(
+                          children: [
+                            Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                _buildInitialsAvatar(),
+                                if (_photoUrl != null && _photoUrl!.isNotEmpty)
+                                  Container(
                                     width: 100,
                                     height: 100,
-                                    fit: BoxFit.cover,
-                                  )
-                                : Container(
-                                    width: 100,
-                                    height: 100,
-                                    color: const Color(0xFFFF6B35),
-                                    alignment: Alignment.center,
-                                    child: Text(
-                                      _avatarInitials,
-                                      style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      image: DecorationImage(
+                                        image: NetworkImage(_photoUrl!),
+                                        fit: BoxFit.cover,
+                                        onError: (e, s) {
+                                          debugPrint('Lỗi load ảnh: $e');
+                                        },
+                                      ),
                                     ),
                                   ),
-                          ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: const BoxDecoration(color: Color(0xFFFF6B35), shape: BoxShape.circle),
-                              child: const Icon(Icons.camera_alt_outlined, color: Colors.white, size: 14),
+                              ],
                             ),
-                          ),
-                        ],
+                            if (_isUploadingImage)
+                              Positioned.fill(
+                                child: Container(
+                                  decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(60)),
+                                  child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Text(_fullName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
@@ -141,6 +146,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       _field('Email', _emailCtrl, Icons.email_outlined),
                       _field('Số điện thoại', _phoneCtrl, Icons.phone_outlined),
                       _field('Mã số thuế', _taxCtrl, Icons.receipt_long_outlined),
+                      _field('Ảnh đại diện (URL)', _photoCtrl, Icons.image_outlined),
                     ]),
                     const SizedBox(height: 16),
                     _buildCard('Bảo mật', [
@@ -148,7 +154,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         contentPadding: EdgeInsets.zero,
                         leading: const Icon(Icons.lock_outline, color: Color(0xFFFF6B35)),
                         title: const Text('Đổi mật khẩu', style: TextStyle(fontWeight: FontWeight.w500)),
-                        subtitle: const Text('Lần đổi gần nhất: 30 ngày trước', style: TextStyle(fontSize: 12)),
+                        subtitle: const Text('Vui lòng cập nhật mật khẩu 3 tháng 1 lần để bảo mật tốt hơn!', style: TextStyle(fontSize: 12)),
                         trailing: OutlinedButton(
                           onPressed: _showPasswordChangeDialog,
                           style: OutlinedButton.styleFrom(
@@ -187,6 +193,32 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Widget _buildInitialsAvatar() {
+    return Container(
+      width: 100,
+      height: 100,
+      decoration: const BoxDecoration(
+        color: Color(0xFFFF6B35),
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 4.0), // Chỉnh nhẹ để cân đối theo font
+        child: Text(
+          _avatarInitials,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white, 
+            fontSize: 32, 
+            fontWeight: FontWeight.bold,
+            height: 1.0,
+            letterSpacing: 1.5,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildCard(String title, List<Widget> children) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -219,6 +251,11 @@ class _ProfilePageState extends State<ProfilePage> {
           filled: true,
           fillColor: const Color(0xFFF9F9F9),
         ),
+        onChanged: (val) {
+          if (label.contains('Ảnh đại diện')) {
+            setState(() => _photoUrl = val);
+          }
+        },
       ),
     );
   }
@@ -285,6 +322,8 @@ class _ProfilePageState extends State<ProfilePage> {
     final confirmCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
     bool isSaving = false;
+    bool obscurePassword = true;
+    String? oldPasswordError;
 
     await showDialog(
       context: context,
@@ -292,7 +331,9 @@ class _ProfilePageState extends State<ProfilePage> {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setStateDialog) => AlertDialog(
           backgroundColor: Colors.white,
-          title: const Text('Đổi mật khẩu', style: TextStyle(fontWeight: FontWeight.bold)),
+          title: const Center(
+            child: Text('Đổi mật khẩu', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
           content: Form(
             key: formKey,
             child: Column(
@@ -300,22 +341,47 @@ class _ProfilePageState extends State<ProfilePage> {
               children: [
                 TextFormField(
                   controller: oldCtrl,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Mật khẩu cũ', border: OutlineInputBorder()),
+                  obscureText: obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'Mật khẩu cũ', 
+                    border: const OutlineInputBorder(),
+                    errorText: oldPasswordError,
+                    suffixIcon: IconButton(
+                      icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
+                      onPressed: () => setStateDialog(() => obscurePassword = !obscurePassword),
+                    ),
+                  ),
+                  onChanged: (v) {
+                    if (oldPasswordError != null) setStateDialog(() => oldPasswordError = null);
+                  },
                   validator: (v) => v!.isEmpty ? 'Vui lòng nhập mật khẩu cũ' : null,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: newCtrl,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Mật khẩu mới', border: OutlineInputBorder()),
+                  obscureText: obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'Mật khẩu mới', 
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
+                      onPressed: () => setStateDialog(() => obscurePassword = !obscurePassword),
+                    ),
+                  ),
                   validator: (v) => v!.length < 6 ? 'Mật khẩu mới ít nhất 6 ký tự' : null,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: confirmCtrl,
-                  obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Xác nhận mật khẩu mới', border: OutlineInputBorder()),
+                  obscureText: obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'Xác nhận mật khẩu mới', 
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
+                      onPressed: () => setStateDialog(() => obscurePassword = !obscurePassword),
+                    ),
+                  ),
                   validator: (v) => v != newCtrl.text ? 'Mật khẩu xác nhận không khớp' : null,
                 ),
               ],
@@ -334,11 +400,15 @@ class _ProfilePageState extends State<ProfilePage> {
                         setStateDialog(() => isSaving = true);
                         try {
                           await AuthService().changePassword(oldCtrl.text, newCtrl.text);
-                          if (mounted) Navigator.pop(ctx);
-                          _showSuccessDialog('Đổi mật khẩu thành công!');
+                          if (mounted) {
+                            Navigator.pop(ctx);
+                            _showSuccessDialog('Đổi mật khẩu thành công');
+                          }
                         } catch (e) {
-                          setStateDialog(() => isSaving = false);
-                          _showErrorDialog(e.toString());
+                          setStateDialog(() {
+                            isSaving = false;
+                            oldPasswordError = e.toString().replaceAll('Exception: ', '');
+                          });
                         }
                       }
                     },
@@ -351,12 +421,46 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  Future<void> _showUpdatePhotoDialog() async {
+    final ctrl = TextEditingController(text: _photoCtrl.text);
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: const Text('Cập nhật Ảnh đại diện', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: ctrl,
+          decoration: InputDecoration(
+            labelText: 'URL Ảnh (bắt đầu bằng http...)',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFFF6B35))),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy', style: TextStyle(color: Colors.grey))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B35), foregroundColor: Colors.white),
+            onPressed: () {
+              setState(() {
+                _photoUrl = ctrl.text.trim();
+                _photoCtrl.text = ctrl.text.trim();
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text('Lưu Link'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _save() async {
     try {
       await AuthService().updateMerchantProfile(
         _nameCtrl.text.trim(),
         _phoneCtrl.text.trim(),
         _taxCtrl.text.trim(),
+        _photoCtrl.text.trim().isNotEmpty ? _photoCtrl.text.trim() : null,
       );
       
       if (mounted) {

@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'auth_service.dart';
 import '../models/wallet_model.dart';
 import '../models/transaction_model.dart';
 import 'api_constants.dart';
@@ -12,11 +12,9 @@ class WalletApiService {
     headers: {'Content-Type': 'application/json'},
   ))..interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          final token = await user.getIdToken();
+        final token = await AuthService().getToken();
+        if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
-          options.headers['X-Firebase-Token'] = token;
         }
         return handler.next(options);
       },
@@ -50,11 +48,16 @@ class WalletApiService {
     }
   }
 
-  Future<Transaction> requestWithdraw(double amount) async {
+  Future<Transaction> requestWithdraw(double amount, String bankName, String bankAccountNumber, String bankAccountName) async {
     try {
       final response = await _dio.post(
         '/merchants/withdraw',
-        data: {'amount': amount},
+        data: {
+          'amount': amount,
+          'bankName': bankName,
+          'bankAccountNumber': bankAccountNumber,
+          'bankAccountName': bankAccountName,
+        },
       );
       if (response.statusCode == 200 && response.data['success'] == true) {
         return Transaction.fromJson(response.data['data']);

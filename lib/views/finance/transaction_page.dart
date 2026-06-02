@@ -41,8 +41,8 @@ class _TransactionPageState extends State<TransactionPage> {
   }
 
   List<Transaction> get _filtered {
-    if (_filter == 'Tiền vào') return _transactions.where((t) => t.type == 'order_payment' || t.type == 'delivery_income' || t.type == 'refund').toList();
-    if (_filter == 'Tiền ra') return _transactions.where((t) => t.type == 'withdrawal').toList();
+    if (_filter == 'Tiền vào') return _transactions.where((t) => t.type == 1 || t.type == 2 || t.type == 4).toList();
+    if (_filter == 'Tiền ra') return _transactions.where((t) => t.type == 3).toList();
     return _transactions;
   }
 
@@ -115,9 +115,9 @@ class _TransactionPageState extends State<TransactionPage> {
   }
 
   Widget _buildRow(Transaction tx) {
-    final isCredit = tx.type == 'order_payment' || tx.type == 'delivery_income' || tx.type == 'refund';
+    final isCredit = tx.type == 1 || tx.type == 2 || tx.type == 4;
     final amountStr = _currencyFormat.format(tx.netAmount);
-    final timeStr = tx.createdAt != null ? DateFormat('HH:mm dd/MM/yyyy').format(tx.createdAt!) : '';
+    final timeStr = tx.createdAt != null ? DateFormat('HH:mm dd/MM/yyyy').format(tx.createdAt!.toLocal()) : '';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
@@ -136,7 +136,7 @@ class _TransactionPageState extends State<TransactionPage> {
           const SizedBox(width: 12),
           Expanded(child: Text(tx.description, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13))),
           SizedBox(width: 200, child: Text(timeStr, style: const TextStyle(color: Colors.grey, fontSize: 12))),
-          SizedBox(width: 160, child: Text(tx.type == 'order_payment' ? 'Doanh thu đơn hàng' : (tx.type == 'withdrawal' ? 'Yêu cầu rút tiền' : ''), style: const TextStyle(color: Colors.grey, fontSize: 12))),
+          SizedBox(width: 160, child: Text(tx.type == 1 ? 'Doanh thu đơn hàng' : (tx.type == 3 ? 'Yêu cầu rút tiền' : ''), style: const TextStyle(color: Colors.grey, fontSize: 12))),
           SizedBox(
             width: 140,
             child: Text(

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../controllers/theme_controller.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -16,12 +18,42 @@ class _SettingsPageState extends State<SettingsPage> {
   String _language = 'Tiếng Việt';
 
   @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _pushEnabled = prefs.getBool('setting_push') ?? true;
+      _orderNotif = prefs.getBool('setting_order') ?? true;
+      _reviewNotif = prefs.getBool('setting_review') ?? true;
+      _paymentNotif = prefs.getBool('setting_payment') ?? true;
+      _darkMode = prefs.getBool('setting_dark') ?? false;
+      _language = prefs.getString('setting_language') ?? 'Tiếng Việt';
+    });
+  }
+
+  Future<void> _saveSetting(String key, dynamic value) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (value is bool) {
+      await prefs.setBool(key, value);
+    } else if (value is String) {
+      await prefs.setString(key, value);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : const Color(0xFF1E1E2D);
+
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Cài đặt', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2D))),
+          Text('Cài đặt', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: textColor)),
           const SizedBox(height: 4),
           const Text('Tuỳ chỉnh giao diện và thông báo', style: TextStyle(fontSize: 14, color: Colors.grey)),
           const SizedBox(height: 24),
@@ -32,7 +64,11 @@ class _SettingsPageState extends State<SettingsPage> {
                 child: Column(
                   children: [
                     _buildSection('Giao diện', [
-                      _switchTile('Chế độ tối', 'Thay đổi giao diện sang màu tối', Icons.dark_mode_outlined, _darkMode, (v) => setState(() => _darkMode = v)),
+                      _switchTile('Chế độ tối', 'Thay đổi giao diện sang màu tối', Icons.dark_mode_outlined, _darkMode, (v) {
+                        setState(() => _darkMode = v);
+                        ThemeController.instance.toggleTheme(v);
+                        _saveSetting('setting_dark', v);
+                      }),
                       const Divider(height: 1),
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -52,7 +88,10 @@ class _SettingsPageState extends State<SettingsPage> {
                             DropdownButton<String>(
                               value: _language,
                               items: ['Tiếng Việt', 'English'].map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
-                              onChanged: (v) => setState(() => _language = v!),
+                              onChanged: (v) {
+                                setState(() => _language = v!);
+                                _saveSetting('setting_language', v);
+                              },
                               underline: const SizedBox(),
                             ),
                           ],
@@ -61,13 +100,25 @@ class _SettingsPageState extends State<SettingsPage> {
                     ]),
                     const SizedBox(height: 16),
                     _buildSection('Thông báo', [
-                      _switchTile('Bật Push Notification', 'Nhận thông báo đẩy trên thiết bị', Icons.notifications_outlined, _pushEnabled, (v) => setState(() => _pushEnabled = v)),
+                      _switchTile('Bật Push Notification', 'Nhận thông báo đẩy trên thiết bị', Icons.notifications_outlined, _pushEnabled, (v) {
+                        setState(() => _pushEnabled = v);
+                        _saveSetting('setting_push', v);
+                      }),
                       const Divider(height: 1),
-                      _switchTile('Đơn hàng mới', 'Thông báo khi có đơn hàng mới', Icons.shopping_bag_outlined, _orderNotif, (v) => setState(() => _orderNotif = v)),
+                      _switchTile('Đơn hàng', 'Thông báo về tình trạng các đơn hàng', Icons.shopping_bag_outlined, _orderNotif, (v) {
+                        setState(() => _orderNotif = v);
+                        _saveSetting('setting_order', v);
+                      }),
                       const Divider(height: 1),
-                      _switchTile('Đánh giá mới', 'Thông báo khi có đánh giá từ khách', Icons.star_outline, _reviewNotif, (v) => setState(() => _reviewNotif = v)),
+                      _switchTile('Đánh giá', 'Thông báo khi có đánh giá mới từ khách', Icons.star_outline, _reviewNotif, (v) {
+                        setState(() => _reviewNotif = v);
+                        _saveSetting('setting_review', v);
+                      }),
                       const Divider(height: 1),
-                      _switchTile('Thanh toán', 'Thông báo cập nhật ví và thanh toán', Icons.payment_outlined, _paymentNotif, (v) => setState(() => _paymentNotif = v)),
+                      _switchTile('Thanh toán', 'Thông báo cập nhật ví và thanh toán', Icons.payment_outlined, _paymentNotif, (v) {
+                        setState(() => _paymentNotif = v);
+                        _saveSetting('setting_payment', v);
+                      }),
                     ]),
                   ],
                 ),
@@ -132,17 +183,18 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Widget _buildSection(String title, List<Widget> children) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2D))),
+          Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF1E1E2D))),
           const Divider(height: 20),
           ...children,
         ],

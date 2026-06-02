@@ -6,6 +6,9 @@ class Wallet {
   final double totalEarned;
   final double totalWithdrawn;
   final double pendingBalance;
+  final String? bankName;
+  final String? bankAccountNumber;
+  final String? bankAccountName;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -17,6 +20,9 @@ class Wallet {
     required this.totalEarned,
     required this.totalWithdrawn,
     required this.pendingBalance,
+    this.bankName,
+    this.bankAccountNumber,
+    this.bankAccountName,
     this.createdAt,
     this.updatedAt,
   });
@@ -30,6 +36,9 @@ class Wallet {
       totalEarned: (json['totalEarned'] ?? 0).toDouble(),
       totalWithdrawn: (json['totalWithdrawn'] ?? 0).toDouble(),
       pendingBalance: (json['pendingBalance'] ?? 0).toDouble(),
+      bankName: json['bankName'],
+      bankAccountNumber: json['bankAccountNumber'],
+      bankAccountName: json['bankAccountName'],
       createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'].toString()) : null,
       updatedAt: json['updatedAt'] != null ? DateTime.tryParse(json['updatedAt'].toString()) : null,
     );
@@ -44,6 +53,9 @@ class Wallet {
       'totalEarned': totalEarned,
       'totalWithdrawn': totalWithdrawn,
       'pendingBalance': pendingBalance,
+      'bankName': bankName,
+      'bankAccountNumber': bankAccountNumber,
+      'bankAccountName': bankAccountName,
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
     };

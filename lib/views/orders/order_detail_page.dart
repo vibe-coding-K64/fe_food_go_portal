@@ -31,6 +31,21 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     }
   }
 
+  Future<void> _confirmOrder() async {
+    final order = OrderDetailPage.currentOrder;
+    if (order == null || order.id == null) return;
+    try {
+      await _apiService.confirmOrder(order.id!);
+      final updatedOrder = await _apiService.getOrderById(order.id!);
+      setState(() {
+        OrderDetailPage.currentOrder = updatedOrder;
+      });
+      if (mounted) _showNotificationDialog(context, 'Đã xác nhận đơn hàng thành công!', true);
+    } catch (e) {
+      if (mounted) _showNotificationDialog(context, 'Lỗi xác nhận: $e', false);
+    }
+  }
+
   void _showNotificationDialog(BuildContext context, String message, bool isSuccess) {
     showDialog(
       context: context,
@@ -88,7 +103,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     
     String timeStr = '--:--';
     if (order.createdAt != null) {
-      timeStr = '${order.createdAt!.hour.toString().padLeft(2, '0')}:${order.createdAt!.minute.toString().padLeft(2, '0')} - ${order.createdAt!.day}/${order.createdAt!.month}';
+      final localTime = order.createdAt!.toLocal();
+      timeStr = '${localTime.hour.toString().padLeft(2, '0')}:${localTime.minute.toString().padLeft(2, '0')} - ${localTime.day.toString().padLeft(2, '0')}/${localTime.month.toString().padLeft(2, '0')}/${localTime.year}';
     }
 
     return SingleChildScrollView(
@@ -190,8 +206,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
 
   Widget _buildCustomerInfo(Order order) {
     return _card('Thông tin khách hàng & giao hàng', [
-      _row(Icons.person_outline, 'Khách hàng', order.customerName.isEmpty ? 'Khách lạ' : order.customerName),
-      _row(Icons.phone_outlined, 'Số điện thoại', order.customerPhone.isEmpty ? 'Trống' : order.customerPhone),
+      _row(Icons.person_outline, 'Khách hàng', order.receiverName.isEmpty ? 'Khách lạ' : order.receiverName),
+      _row(Icons.phone_outlined, 'Số điện thoại', order.receiverPhone.isEmpty ? 'Trống' : order.receiverPhone),
       _row(Icons.location_on_outlined, 'Địa chỉ giao', order.deliveryAddress.isEmpty ? 'Tại quán' : order.deliveryAddress),
       _row(Icons.delivery_dining_outlined, 'Tài xế', order.driverName.isEmpty ? 'Chưa nhận' : '${order.driverName} (${order.driverPhone})'),
     ]);
@@ -200,7 +216,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   Widget _buildStatusCard(Order order) {
     bool isCanceled = order.status == 'Đã hủy';
     int step = 1;
-    if (order.status == 'Đang chế biến') step = 2;
+    if (order.status == 'Đang chuẩn bị') step = 2;
     if (order.status == 'Đang giao') step = 3;
     if (order.status == 'Hoàn thành') step = 4;
     
@@ -208,7 +224,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
       const Text('Đơn hàng này đã bị hủy', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
     ] : [
       _statusStep('Đặt hàng', '', step >= 1),
-      _statusStep('Đang chế biến', '', step >= 2),
+      _statusStep('Đang chuẩn bị', '', step >= 2),
       _statusStep('Đang giao', '', step >= 3),
       _statusStep('Hoàn thành', '', step >= 4),
       const SizedBox(height: 16),
@@ -217,7 +233,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
           children: [
             Expanded(
               child: ElevatedButton(
-                onPressed: () => _updateStatus('Đang chế biến'),
+                onPressed: _confirmOrder,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
                   foregroundColor: Colors.white,
@@ -300,7 +316,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   Widget _buildPaymentSummary(Order order) {
     return _card('Thanh toán', [
       _payRow('Tổng món', '${order.totalAmount.toInt()}đ'),
-      _payRow('Phí giao hàng', '${order.shippingFee.toInt()}đ'),
+      _payRow('Phí giao hàng', '${order.deliveryFee.toInt()}đ'),
       if (order.discountAmount > 0)
         _payRow('Giảm giá', '-${order.discountAmount.toInt()}đ', color: Colors.green),
       const Divider(height: 20),

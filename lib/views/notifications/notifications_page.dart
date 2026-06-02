@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../data/services/notification_service.dart';
+import 'package:intl/intl.dart';
 
 class NotificationsPage extends StatefulWidget {
   const NotificationsPage({super.key});
@@ -8,79 +10,94 @@ class NotificationsPage extends StatefulWidget {
 }
 
 class _NotificationsPageState extends State<NotificationsPage> {
-  final List<Map<String, dynamic>> _notifications = [
-    {'title': 'Đơn hàng mới #OD-006', 'body': 'Nguyễn Văn A vừa đặt 3 món - 215.000đ', 'time': '14:23', 'isRead': false, 'type': 'order'},
-    {'title': 'Thanh toán thành công', 'body': 'Bạn nhận được 89.000đ từ đơn #OD-001', 'time': '14:10', 'isRead': false, 'type': 'payment'},
-    {'title': 'Đánh giá mới', 'body': 'Trần Thị B đánh giá 4★ cho quán của bạn', 'time': '13:45', 'isRead': true, 'type': 'review'},
-    {'title': 'Đơn hàng bị hủy', 'body': 'Khách hàng hủy đơn #OD-005 - Lý do: Đặt nhầm', 'time': '12:55', 'isRead': true, 'type': 'cancel'},
-    {'title': 'Rút tiền thành công', 'body': 'Yêu cầu rút 2.000.000đ đã được duyệt', 'time': '10:00', 'isRead': true, 'type': 'wallet'},
-  ];
 
   @override
   Widget build(BuildContext context) {
-    final unreadCount = _notifications.where((n) => !n['isRead']).length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return ValueListenableBuilder<List<Map<String, dynamic>>>(
+      valueListenable: NotificationService().notificationsNotifier,
+      builder: (context, notifications, child) {
+        final unreadCount = NotificationService().unreadCountNotifier.value;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Thông báo', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2D))),
-                    const SizedBox(width: 12),
-                    if (unreadCount > 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                        decoration: BoxDecoration(color: const Color(0xFFFF6B35), borderRadius: BorderRadius.circular(20)),
-                        child: Text('$unreadCount mới', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                      ),
+                    Row(
+                      children: [
+                        const Text('Thông báo', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2D))),
+                        const SizedBox(width: 12),
+                        if (unreadCount > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            decoration: BoxDecoration(color: const Color(0xFFFF6B35), borderRadius: BorderRadius.circular(20)),
+                            child: Text('$unreadCount mới', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    const Text('Đơn hàng, thanh toán và cập nhật từ hệ thống', style: TextStyle(fontSize: 14, color: Colors.grey)),
                   ],
                 ),
-                const SizedBox(height: 4),
-                const Text('Đơn hàng, thanh toán và cập nhật từ hệ thống', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                if (unreadCount > 0)
+                  TextButton.icon(
+                    onPressed: () {
+                      NotificationService().markAllAsRead();
+                    },
+                    icon: const Icon(Icons.done_all, size: 16, color: Color(0xFFFF6B35)),
+                    label: const Text('Đánh dấu tất cả đã đọc', style: TextStyle(color: Color(0xFFFF6B35))),
+                  ),
               ],
             ),
-            TextButton.icon(
-              onPressed: () => setState(() {
-                for (final n in _notifications) n['isRead'] = true;
-              }),
-              icon: const Icon(Icons.done_all, size: 16, color: Color(0xFFFF6B35)),
-              label: const Text('Đánh dấu tất cả đã đọc', style: TextStyle(color: Color(0xFFFF6B35))),
+            const SizedBox(height: 20),
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+                ),
+                child: notifications.isEmpty
+                    ? const Center(child: Text('Không có thông báo nào.'))
+                    : ListView.separated(
+                        itemCount: notifications.length,
+                        separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade100),
+                        itemBuilder: (context, i) => _buildNotificationRow(notifications[i]),
+                      ),
+              ),
             ),
           ],
-        ),
-        const SizedBox(height: 20),
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
-            ),
-            child: ListView.separated(
-              itemCount: _notifications.length,
-              separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade100),
-              itemBuilder: (context, i) => _buildNotificationRow(i),
-            ),
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 
-  Widget _buildNotificationRow(int index) {
-    final n = _notifications[index];
-    final typeIcon = _typeIcon(n['type']);
-    final typeColor = _typeColor(n['type']);
+  Widget _buildNotificationRow(Map<String, dynamic> n) {
+    final bool isRead = n['isRead'] ?? true;
+    final String typeStr = (n['type'] ?? 1).toString();
+    final typeIcon = _typeIcon(typeStr);
+    final typeColor = _typeColor(typeStr);
+    
+    String timeStr = '';
+    if (n['createdAt'] != null) {
+      try {
+        DateTime dt = DateTime.parse(n['createdAt']).toLocal();
+        timeStr = DateFormat('dd/MM HH:mm').format(dt);
+      } catch (_) {}
+    }
+
     return InkWell(
-      onTap: () => setState(() => _notifications[index]['isRead'] = true),
+      onTap: () {
+        if (!isRead && n['id'] != null) {
+          NotificationService().markAsRead(n['id']);
+        }
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        color: n['isRead'] ? Colors.transparent : const Color(0xFFFFF8F5),
+        color: isRead ? Colors.transparent : const Color(0xFFFFF8F5),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -99,13 +116,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(n['title'],
+                  Text(n['title'] ?? '',
                       style: TextStyle(
-                          fontWeight: n['isRead'] ? FontWeight.normal : FontWeight.bold,
+                          fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
                           fontSize: 14,
                           color: const Color(0xFF1E1E2D))),
                   const SizedBox(height: 4),
-                  Text(n['body'], style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                  Text(n['body'] ?? '', style: const TextStyle(color: Colors.grey, fontSize: 13)),
                 ],
               ),
             ),
@@ -113,9 +130,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(n['time'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                Text(timeStr, style: const TextStyle(color: Colors.grey, fontSize: 12)),
                 const SizedBox(height: 6),
-                if (!n['isRead'])
+                if (!isRead)
                   Container(
                     width: 8,
                     height: 8,
@@ -131,22 +148,20 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   IconData _typeIcon(String type) {
     switch (type) {
-      case 'order': return Icons.shopping_bag_outlined;
-      case 'payment': return Icons.account_balance_wallet_outlined;
-      case 'review': return Icons.star_outline;
-      case 'cancel': return Icons.cancel_outlined;
-      case 'wallet': return Icons.savings_outlined;
+      case '1': return Icons.shopping_bag_outlined;
+      case '2': return Icons.account_balance_wallet_outlined;
+      case '3': return Icons.star_outline;
+      case '4': return Icons.cancel_outlined;
       default: return Icons.notifications_outlined;
     }
   }
 
   Color _typeColor(String type) {
     switch (type) {
-      case 'order': return const Color(0xFFFF6B35);
-      case 'payment': return Colors.green;
-      case 'review': return Colors.amber;
-      case 'cancel': return Colors.red;
-      case 'wallet': return Colors.purple;
+      case '1': return const Color(0xFFFF6B35);
+      case '2': return Colors.green;
+      case '3': return Colors.amber;
+      case '4': return Colors.red;
       default: return Colors.blue;
     }
   }

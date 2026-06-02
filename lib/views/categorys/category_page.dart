@@ -168,42 +168,28 @@ class _MenuCategoryPageState extends State<MenuCategoryPage> {
         Expanded(
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: const Color(0xFFF8F9FA),
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
             ),
             child: Column(
               children: [
-                // Table header
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8F9FA),
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                    border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-                  ),
-                  child: const Row(
-                    children: [
-                      SizedBox(width: 60, child: Center(child: Text('STT', style: TextStyle(fontWeight: FontWeight.bold)))),
-                      SizedBox(width: 24),
-                      Expanded(child: Text('Tên danh mục', style: TextStyle(fontWeight: FontWeight.bold))),
-                      SizedBox(width: 120, child: Text('Icon/Ảnh', style: TextStyle(fontWeight: FontWeight.bold))),
-                      SizedBox(width: 100, child: Text('Thứ tự', style: TextStyle(fontWeight: FontWeight.bold))),
-                      SizedBox(width: 120, child: Text('Thao tác', style: TextStyle(fontWeight: FontWeight.bold))),
-                    ],
-                  ),
-                ),
                 Expanded(
                   child: _isLoading
                       ? const Center(child: CircularProgressIndicator())
                       : _categories.isEmpty
                           ? const Center(child: Text('Chưa có danh mục nào.'))
-                          : ListView.separated(
+                          : GridView.builder(
+                              padding: const EdgeInsets.all(24),
+                              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 250,
+                                crossAxisSpacing: 20,
+                                mainAxisSpacing: 20,
+                                childAspectRatio: 1.1,
+                              ),
                               itemCount: _paginatedCategories.length,
-                              separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade100),
                               itemBuilder: (context, idx) {
                                 final globalIndex = (_currentPage - 1) * _itemsPerPage + idx;
-                                return _buildRow(globalIndex, _paginatedCategories[idx]);
+                                return _buildCard(globalIndex, _paginatedCategories[idx]);
                               },
                             ),
                 ),
@@ -216,83 +202,114 @@ class _MenuCategoryPageState extends State<MenuCategoryPage> {
     );
   }
 
-  Widget _buildRow(int index, Category cat) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-      child: Row(
+  Widget _buildCard(int index, Category cat) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Stack(
         children: [
-          SizedBox(
-            width: 60,
-            child: Center(
-              child: Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF3E0),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Center(
-                  child: Text('${index + 1}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFFF6B35), fontSize: 13)),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 24),
-          Expanded(
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 3,
+                child: Container(
                   decoration: BoxDecoration(
                     color: Colors.orangeAccent.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
                   ),
                   clipBehavior: Clip.hardEdge,
                   child: (cat.imageUrl != null && cat.imageUrl!.isNotEmpty)
-                      ? Image.network(cat.imageUrl!, fit: BoxFit.cover, errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image, size: 20))
-                      : const Icon(Icons.category_outlined, color: Color(0xFFFF6B35), size: 20),
+                      ? Image.network(cat.imageUrl!, fit: BoxFit.cover, errorBuilder: (ctx, err, st) => const Icon(Icons.broken_image, size: 40, color: Colors.grey))
+                      : const Icon(Icons.category_outlined, color: Color(0xFFFF6B35), size: 40),
                 ),
-                const SizedBox(width: 12),
-                Text(cat.name,
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-              ],
-            ),
-          ),
-          SizedBox(
-            width: 120,
-            child: Text(cat.icon ?? 'N/A', style: const TextStyle(color: Colors.blueGrey, fontSize: 13)),
-          ),
-          SizedBox(
-            width: 100,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE3F2FD),
-                borderRadius: BorderRadius.circular(20),
               ),
-              child: Center(
-                child: Text('Vị trí ${cat.order}',
-                    style: const TextStyle(color: Colors.blue, fontSize: 12, fontWeight: FontWeight.w500)),
+              Expanded(
+                flex: 2,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF8F9FA),
+                    borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        cat.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold, 
+                          fontSize: 16,
+                          color: Color(0xFF2D3748), // Màu xám đậm sang trọng
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-          SizedBox(
-            width: 120,
+          Positioned(
+            top: 8,
+            right: 8,
             child: Row(
               children: [
-                IconButton(
-                  onPressed: () => _showCategoryDialog(context, category: cat),
-                  icon: const Icon(Icons.edit_outlined, color: Color(0xFFFF6B35)),
-                  tooltip: 'Sửa',
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    iconSize: 16,
+                    padding: EdgeInsets.zero,
+                    onPressed: () => _showCategoryDialog(context, category: cat),
+                    icon: const Icon(Icons.edit_outlined, color: Color(0xFFFF6B35)),
+                    tooltip: 'Sửa',
+                  ),
                 ),
-                IconButton(
-                  onPressed: () => _confirmDelete(context, cat),
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
-                  tooltip: 'Xóa',
+                const SizedBox(width: 4),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    iconSize: 16,
+                    padding: EdgeInsets.zero,
+                    onPressed: () => _confirmDelete(context, cat),
+                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    tooltip: 'Xóa',
+                  ),
                 ),
               ],
+            ),
+          ),
+          Positioned(
+            top: 8,
+            left: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF6B35),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '#${index + 1}',
+                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],
