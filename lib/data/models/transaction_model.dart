@@ -2,13 +2,13 @@ class Transaction {
   final String? id;
   final String walletId;
   final String userId;
-  final String type; // order_payment, withdrawal, refund
+  final int type; // 1: order_payment, 2: delivery_income, 3: withdrawal, 4: refund
   final double amount;
   final double fee;
   final double netAmount;
   final String description;
   final String? orderId;
-  final String status; // pending, completed, failed
+  final int status; // 0: pending, 1: completed, 2: failed
   final DateTime? createdAt;
 
   Transaction({
@@ -30,13 +30,13 @@ class Transaction {
       id: json['id'],
       walletId: json['walletId'] ?? '',
       userId: json['userId'] ?? '',
-      type: json['type'] ?? '',
+      type: json['type'] ?? 0,
       amount: (json['amount'] ?? 0).toDouble(),
       fee: (json['fee'] ?? 0).toDouble(),
       netAmount: (json['netAmount'] ?? 0).toDouble(),
       description: json['description'] ?? '',
       orderId: json['orderId'],
-      status: json['status'] ?? 'pending',
+      status: json['status'] ?? 0,
       createdAt: _parseDate(json['createdAt']),
     );
   }

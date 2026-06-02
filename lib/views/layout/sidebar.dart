@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../data/services/notification_service.dart';
 
 class Sidebar extends StatefulWidget {
   final Function(String) onNavigate;
@@ -15,6 +16,14 @@ class Sidebar extends StatefulWidget {
 }
 
 class _SidebarState extends State<Sidebar> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -69,9 +78,17 @@ class _SidebarState extends State<Sidebar> {
           const SizedBox(height: 6),
 
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              children: [
+            child: RawScrollbar(
+              controller: _scrollController,
+              thumbColor: Colors.white38,
+              radius: const Radius.circular(8),
+              thickness: 8,
+              thumbVisibility: true,
+              interactive: true,
+              child: ListView(
+                controller: _scrollController,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                children: [
                 // GIAN HÀNG
                 _section('GIAN HÀNG'),
                 _item(Icons.dashboard_outlined, 'Bảng điều khiển', '/dashboard'),
@@ -91,13 +108,18 @@ class _SidebarState extends State<Sidebar> {
                 // TÀI CHÍNH
                 _section('TÀI CHÍNH'),
                 _item(Icons.account_balance_wallet_outlined, 'Ví doanh thu', '/finance/wallet'),
-                _item(Icons.receipt_long_outlined, 'Lịch sử GD', '/finance/transactions'),
+                _item(Icons.receipt_long_outlined, 'Lịch sử giao dịch', '/finance/transactions'),
                 _item(Icons.savings_outlined, 'Rút tiền', '/finance/withdrawal'),
 
                 // HỖ TRỢ
                 _section('HỖ TRỢ'),
                 _item(Icons.chat_bubble_outline, 'Chat khách hàng', '/chat'),
-                _item(Icons.notifications_outlined, 'Thông báo', '/notifications'),
+                ValueListenableBuilder<int>(
+                  valueListenable: NotificationService().unreadCountNotifier,
+                  builder: (context, count, child) {
+                    return _item(Icons.notifications_outlined, 'Thông báo', '/notifications', badgeCount: count);
+                  },
+                ),
                 _item(Icons.report_gmailerrorred_outlined, 'Khiếu nại', '/report-tickets'),
 
                 // TÀI KHOẢN
@@ -106,6 +128,7 @@ class _SidebarState extends State<Sidebar> {
                 _item(Icons.settings_outlined, 'Cài đặt', '/settings'),
               ],
             ),
+          ),
           ),
 
           // FOOTER
@@ -134,7 +157,7 @@ class _SidebarState extends State<Sidebar> {
     );
   }
 
-  Widget _item(IconData icon, String title, String route) {
+  Widget _item(IconData icon, String title, String route, {int badgeCount = 0}) {
     final bool isActive = widget.currentRoute == route;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -169,7 +192,19 @@ class _SidebarState extends State<Sidebar> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (isActive)
+              if (badgeCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    badgeCount > 99 ? '99+' : badgeCount.toString(),
+                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                )
+              else if (isActive)
                 Container(
                   width: 6,
                   height: 6,

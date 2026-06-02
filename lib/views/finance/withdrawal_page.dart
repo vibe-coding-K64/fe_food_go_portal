@@ -16,6 +16,11 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
   final WalletApiService _apiService = WalletApiService();
   final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'vi_VN', symbol: 'đ');
 
+  final _bankAccountCtrl = TextEditingController();
+  final _bankAccountNameCtrl = TextEditingController();
+  String? _selectedBank;
+  final List<String> _banks = ["Vietcombank", "Techcombank", "MBBank", "BIDV", "VietinBank", "ACB", "Agribank", "VPBank", "Sacombank", "TPBank"];
+
   Wallet? _wallet;
   List<Transaction> _history = [];
   bool _isLoading = true;
@@ -31,16 +36,25 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
     try {
       final wallet = await _apiService.getWallet();
       final allTrans = await _apiService.getTransactions(page: 0, size: 50);
-      final withdrawals = allTrans.where((t) => t.type == 'withdrawal').toList();
+      final withdrawals = allTrans.where((t) => t.type == 3).toList();
       setState(() {
         _wallet = wallet;
         _history = withdrawals;
         _isLoading = false;
+        
+        if (wallet.bankName != null && _banks.contains(wallet.bankName)) {
+          _selectedBank = wallet.bankName;
+        } else if (wallet.bankName != null && wallet.bankName!.isNotEmpty) {
+          _banks.add(wallet.bankName!);
+          _selectedBank = wallet.bankName;
+        }
+        _bankAccountCtrl.text = wallet.bankAccountNumber ?? '';
+        _bankAccountNameCtrl.text = wallet.bankAccountName ?? '';
       });
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+        _showCenterDialog('Lỗi', e.toString(), isError: true);
       }
     }
   }
@@ -145,27 +159,35 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
           // Bank account
           const Text('Tài khoản thụ hưởng', style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14)),
           const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFFFF6B35), width: 2),
-              borderRadius: BorderRadius.circular(10),
-              color: const Color(0xFFFFF3E0),
+          DropdownButtonFormField<String>(
+            value: _selectedBank,
+            decoration: InputDecoration(
+              labelText: 'Chọn ngân hàng',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              filled: true,
+              fillColor: const Color(0xFFF9F9F9),
             ),
-            child: const Row(
-              children: [
-                Icon(Icons.account_balance, color: Color(0xFFFF6B35)),
-                SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Vietcombank - CN TP.HCM', style: TextStyle(fontWeight: FontWeight.bold)),
-                    Text('0123 4567 8901 - NGUYEN VAN A', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  ],
-                ),
-                Spacer(),
-                Icon(Icons.check_circle, color: Color(0xFFFF6B35)),
-              ],
+            items: _banks.map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
+            onChanged: (val) => setState(() => _selectedBank = val),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _bankAccountCtrl,
+            decoration: InputDecoration(
+              labelText: 'Số tài khoản',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              filled: true,
+              fillColor: const Color(0xFFF9F9F9),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _bankAccountNameCtrl,
+            decoration: InputDecoration(
+              labelText: 'Tên chủ tài khoản',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              filled: true,
+              fillColor: const Color(0xFFF9F9F9),
             ),
           ),
           const SizedBox(height: 20),
@@ -212,12 +234,14 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
   Widget _buildHistoryRow(Transaction h) {
     Color statusColor;
     String statusText;
-    switch (h.status) {
+    switch (h.status.toString()) {
       case 'completed': 
+      case '1':
         statusColor = Colors.green; 
         statusText = 'Đã duyệt';
         break;
       case 'pending': 
+      case '0':
         statusColor = Colors.orange; 
         statusText = 'Đang xử lý';
         break;
@@ -226,7 +250,7 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
         statusText = 'Từ chối';
     }
     
-    final dateStr = h.createdAt != null ? DateFormat('dd/MM/yyyy HH:mm').format(h.createdAt!) : '';
+    final dateStr = h.createdAt != null ? DateFormat('HH:mm dd/MM/yyyy').format(h.createdAt!.toLocal()) : '';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -250,7 +274,7 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Vietcombank - NGUYEN VAN A', style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(h.description, style: const TextStyle(fontWeight: FontWeight.w600)),
                   Text(dateStr, style: const TextStyle(color: Colors.grey, fontSize: 12)),
                 ],
               ),
@@ -284,19 +308,36 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
     final amountText = _amountCtrl.text.replaceAll('.', '').replaceAll(',', '');
     final amount = double.tryParse(amountText);
     
-    if (amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Vui lòng nhập số tiền hợp lệ'), backgroundColor: Colors.red));
+    if (amount == null || amount < 50000) {
+      _showCenterDialog('Lỗi', 'Số tiền rút phải từ 50,000 VNĐ trở lên', isError: true);
       return;
     }
     
     if (_wallet != null && amount > _wallet!.balance) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Số dư không đủ'), backgroundColor: Colors.red));
+      _showCenterDialog('Lỗi', 'Số dư không đủ', isError: true);
+      return;
+    }
+    
+    if (_selectedBank == null || _bankAccountCtrl.text.isEmpty || _bankAccountNameCtrl.text.isEmpty) {
+      _showCenterDialog('Lỗi', 'Vui lòng nhập đầy đủ thông tin ngân hàng', isError: true);
+      return;
+    }
+
+    final accRegex = RegExp(r'^[0-9]+$');
+    if (!accRegex.hasMatch(_bankAccountCtrl.text) || _bankAccountCtrl.text.length < 6) {
+      _showCenterDialog('Lỗi', 'Số tài khoản chỉ được chứa chữ số và dài ít nhất 6 ký tự', isError: true);
+      return;
+    }
+
+    final nameRegex = RegExp(r'^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂẠẢẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăạảấầẩẫậắằẳẵặẹẻẽềềểếỄỆỈỊỌỎỐỒỔỖỘỚỜỞỠỢỤỦỨỪễệỉịọỏốồổỗộớờởỡợụủứừỮỰỲỴÝỶỸửữựỳỵỷỹ\s]+$');
+    if (!nameRegex.hasMatch(_bankAccountNameCtrl.text)) {
+      _showCenterDialog('Lỗi', 'Tên chủ tài khoản chỉ được chứa chữ cái và khoảng trắng', isError: true);
       return;
     }
 
     setState(() => _isSubmitting = true);
     try {
-      final tx = await _apiService.requestWithdraw(amount);
+      final tx = await _apiService.requestWithdraw(amount, _selectedBank!, _bankAccountCtrl.text, _bankAccountNameCtrl.text);
       setState(() {
         _amountCtrl.clear();
         _isSubmitting = false;
@@ -309,18 +350,51 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
           totalEarned: _wallet!.totalEarned,
           totalWithdrawn: _wallet!.totalWithdrawn,
           pendingBalance: _wallet!.pendingBalance + amount,
+          bankName: _selectedBank,
+          bankAccountNumber: _bankAccountCtrl.text,
+          bankAccountName: _bankAccountNameCtrl.text,
           createdAt: _wallet!.createdAt,
           updatedAt: DateTime.now()
         );
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gửi yêu cầu rút tiền thành công!'), backgroundColor: Colors.green));
+        _showCenterDialog('Thành công', 'Gửi yêu cầu rút tiền thành công!');
       }
     } catch (e) {
       setState(() => _isSubmitting = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
+        _showCenterDialog('Lỗi', e.toString().replaceAll('Exception: ', ''), isError: true);
       }
     }
+  }
+
+  void _showCenterDialog(String title, String message, {bool isError = false}) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(isError ? Icons.error_outline : Icons.check_circle_outline, color: isError ? Colors.red : Colors.green),
+            const SizedBox(width: 8),
+            Text(title, style: TextStyle(color: isError ? Colors.red : Colors.green, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Text(message, style: const TextStyle(color: Colors.black87, fontSize: 15)),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isError ? Colors.red : const Color(0xFFFF6B35),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
   }
 }

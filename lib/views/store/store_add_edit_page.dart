@@ -284,7 +284,7 @@ class _StoreFormPageState extends State<StoreFormPage> {
           await _apiService.updateStore(_currentStoreId!, newStore);
           await _authService.saveStoreId(_currentStoreId!);
         } else {
-          final uid = _authService.currentUser?.uid;
+          final uid = await _authService.getUserId();
           if (uid == null) throw 'Lỗi xác thực người dùng';
           final createdStore = await _apiService.createStore(uid, newStore);
           if (createdStore.id != null) {

@@ -95,7 +95,7 @@ class _LoginPageState extends State<LoginPage> {
                       TextFormField( 
                         controller: emailController, 
                         decoration: InputDecoration( prefixIcon: const Icon(Icons.email_outlined), 
-                          labelText: "Email", 
+                          labelText: "Email / Tên đăng nhập", 
                           filled: true, 
                           fillColor: Colors.grey.shade100, 
                           border: OutlineInputBorder( 
@@ -104,8 +104,7 @@ class _LoginPageState extends State<LoginPage> {
                           ), 
                         ), 
                         validator: (value) {
-                          if (value == null || value.isEmpty) return 'Vui lòng nhập email';
-                          if (!value.contains('@')) return 'Email không hợp lệ';
+                          if (value == null || value.trim().isEmpty) return 'Vui lòng nhập email hoặc tên đăng nhập';
                           return null;
                         },
                       ), 
@@ -151,15 +150,6 @@ class _LoginPageState extends State<LoginPage> {
                             } catch (e) {
                               if (mounted) {
                                 String errorMsg = e.toString().replaceAll('Exception: ', '');
-                                if (errorMsg.contains('invalid-credential') || errorMsg.contains('wrong-password') || errorMsg.contains('user-not-found')) {
-                                  errorMsg = 'Sai email hoặc mật khẩu. Vui lòng kiểm tra lại!';
-                                } else if (errorMsg.contains('too-many-requests')) {
-                                  errorMsg = 'Bạn đã đăng nhập sai quá nhiều lần. Vui lòng thử lại sau!';
-                                } else if (errorMsg.contains('network-request-failed')) {
-                                  errorMsg = 'Lỗi kết nối mạng. Vui lòng kiểm tra lại internet!';
-                                } else if (errorMsg.contains('invalid-email')) {
-                                  errorMsg = 'Định dạng email không hợp lệ!';
-                                }
 
                                 showDialog(
                                   context: context,
@@ -212,7 +202,12 @@ class _LoginPageState extends State<LoginPage> {
                           const Text("|", style: TextStyle(color: Colors.grey)),
                           TextButton( 
                             onPressed: () {
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterPage()));
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (context) => RegisterPage(
+                                  onLoginSuccess: widget.onLoginSuccess,
+                                )),
+                              );
                             }, 
                             child: const Text("Đăng ký tài khoản"), 
                           ),

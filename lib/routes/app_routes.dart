@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
 import '../views/auth/login_page.dart';
 import '../views/layout/admin_layout.dart';
 import '../views/dashboard/dashboard_page.dart';
@@ -30,9 +30,16 @@ class AppRouterDelegate extends RouterDelegate<String>
     with ChangeNotifier, PopNavigatorRouterDelegateMixin<String> {
   final GlobalKey<NavigatorState> navigatorKey;
   String _currentPath = "/dashboard";
+  late Future<String?> _storeIdFuture;
 
   AppRouterDelegate()
-      : navigatorKey = GlobalKey<NavigatorState>();
+      : navigatorKey = GlobalKey<NavigatorState>() {
+    _storeIdFuture = AuthService().getStoreId();
+    AuthService.authStateNotifier.addListener(() {
+      _storeIdFuture = AuthService().getStoreId();
+      notifyListeners();
+    });
+  }
 
   @override
   String? get currentConfiguration => _currentPath;
@@ -195,14 +202,11 @@ class AppRouterDelegate extends RouterDelegate<String>
         page = const MyDashboard();
     }
 
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
-        }
+    return ValueListenableBuilder<bool>(
+      valueListenable: AuthService.authStateNotifier,
+      builder: (context, isLoggedIn, _) {
         
-        if (!snapshot.hasData) {
+        if (!isLoggedIn) {
           return Navigator(
             key: navigatorKey,
             pages: [
@@ -220,7 +224,7 @@ class AppRouterDelegate extends RouterDelegate<String>
         }
 
         return FutureBuilder<String?>(
-          future: AuthService().getStoreId(),
+          future: _storeIdFuture,
           builder: (context, storeSnapshot) {
             if (storeSnapshot.connectionState == ConnectionState.waiting) {
               return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35))));

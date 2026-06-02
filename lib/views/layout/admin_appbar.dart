@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart'; 
 import '../../data/services/auth_service.dart';
+import '../../data/services/store_api_service.dart';
+import '../../data/services/notification_service.dart';
  
 class AdminAppBar extends StatefulWidget implements PreferredSizeWidget { 
   final Function(String)? onNavigate;
@@ -13,14 +15,21 @@ class AdminAppBar extends StatefulWidget implements PreferredSizeWidget {
 } 
 
 class _AdminAppBarState extends State<AdminAppBar> {
-  String _fullName = "Quản trị viên";
-  String _avatarInitials = "UA";
+  String _fullName = "";
+  String _avatarInitials = "";
   String? _photoUrl;
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
+    AuthService.profileUpdateNotifier.addListener(_loadProfile);
+  }
+
+  @override
+  void dispose() {
+    AuthService.profileUpdateNotifier.removeListener(_loadProfile);
+    super.dispose();
   }
 
   Future<void> _loadProfile() async {
@@ -48,7 +57,9 @@ class _AdminAppBarState extends State<AdminAppBar> {
  
     return AppBar( 
       backgroundColor: Colors.white, 
+      surfaceTintColor: Colors.transparent,
       elevation: 0, // Bỏ bóng đổ mặc định 
+      scrolledUnderElevation: 0,
       automaticallyImplyLeading: false, 
       titleSpacing: 24, 
       // Thêm một đường kẻ mảnh ở dưới AppBar 
@@ -89,18 +100,51 @@ class _AdminAppBarState extends State<AdminAppBar> {
           const Spacer(flex: 1), // Tạo khoảng trống giữa search và icons 
           ///ACTIONS GROUP 
           _buildActionButton(Icons.language, "Ngôn ngữ", () {}), 
-          _buildActionButton( 
-            Icons.notifications_none_outlined, 
-            "Thông báo", 
-            () {}, 
-          ), 
-          _buildActionButton(Icons.shopping_cart_outlined, "Đơn hàng", () {}), 
-          _buildActionButton(Icons.settings_outlined, "Cài đặt", () {}), 
+          ValueListenableBuilder<int>(
+            valueListenable: NotificationService().unreadCountNotifier,
+            builder: (context, count, child) {
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  _buildActionButton(
+                    Icons.notifications_none_outlined, 
+                    "Thông báo", 
+                    () {
+                      if (widget.onNavigate != null) widget.onNavigate!('/notifications');
+                    }, 
+                  ),
+                  if (count > 0)
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.redAccent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          count > 99 ? '99+' : count.toString(),
+                          style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          _buildActionButton(Icons.shopping_cart_outlined, "Đơn hàng", () {
+            if (widget.onNavigate != null) widget.onNavigate!('/orders');
+          }), 
+          _buildActionButton(Icons.settings_outlined, "Cài đặt", () {
+            if (widget.onNavigate != null) widget.onNavigate!('/settings');
+          }), 
  
           const VerticalDivider(indent: 15, endIndent: 15, width: 40), 
  
           /// USER INFO SECTION
           PopupMenuButton<String>( 
+            tooltip: '',
             offset: const Offset(0, 55), 
             shape: RoundedRectangleBorder( 
               borderRadius: BorderRadius.circular(12), 
@@ -116,14 +160,17 @@ class _AdminAppBarState extends State<AdminAppBar> {
                       Text( 
                         _fullName, 
                         style: const TextStyle( 
-                          fontSize: 11, 
-                          color: Color(0xFFFF6B35), 
+                          fontSize: 14, 
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87, 
                         ), 
                       ), 
                     ], 
                   ), 
                   const SizedBox(width: 12), 
                   Container( 
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration( 
                       shape: BoxShape.circle, 
                       border: Border.all( 
@@ -131,19 +178,30 @@ class _AdminAppBarState extends State<AdminAppBar> {
                         width: 2, 
                       ), 
                     ), 
-                    child: _photoUrl != null && _photoUrl!.isNotEmpty
-                        ? CircleAvatar(
-                            radius: 18,
-                            backgroundImage: NetworkImage(_photoUrl!),
-                          )
-                        : CircleAvatar( 
-                            radius: 18, 
-                            backgroundColor: const Color(0xFFFF6B35), 
-                            child: Text( 
-                              _avatarInitials, 
-                              style: const TextStyle(color: Colors.white, fontSize: 12), 
-                            ), 
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        CircleAvatar( 
+                          radius: 18, 
+                          backgroundColor: const Color(0xFFFF6B35), 
+                          child: Text( 
+                            _avatarInitials, 
+                            style: const TextStyle(color: Colors.white, fontSize: 12, height: 1.0), 
                           ), 
+                        ),
+                        if (_photoUrl != null && _photoUrl!.isNotEmpty)
+                          Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              image: DecorationImage(
+                                image: NetworkImage(_photoUrl!),
+                                fit: BoxFit.cover,
+                                onError: (e, s) {},
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ), 
                   const Icon(Icons.arrow_drop_down, color: Colors.grey),
                     ], 

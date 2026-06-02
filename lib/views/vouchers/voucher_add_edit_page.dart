@@ -21,8 +21,7 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
   final AuthService _authService = AuthService();
   final _formKey = GlobalKey<FormState>();
   
-  final _titleCtrl = TextEditingController();
-  final _subtitleCtrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   final _valueCtrl = TextEditingController();
   final _pointsCtrl = TextEditingController();
@@ -32,6 +31,8 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
   final _minOrderCtrl = TextEditingController();
   
   int _discountType = 1; // 1: %, 2: tiền mặt
+  bool _isFreeship = false;
+  bool _isActive = true;
   bool _isSaving = false;
 
   @override
@@ -39,12 +40,12 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
     super.initState();
     if (widget.isEdit && VoucherFormPage.selectedVoucherToEdit != null) {
       final v = VoucherFormPage.selectedVoucherToEdit!;
-      _titleCtrl.text = v.title;
-      _subtitleCtrl.text = v.subtitle;
+      _nameCtrl.text = v.name;
+      _isFreeship = v.isFreeship;
+      _isActive = v.isActive;
       _codeCtrl.text = v.code;
       _discountType = v.type;
       _valueCtrl.text = v.value.toString();
-      _pointsCtrl.text = v.pointsRequired.toString();
       _imageCtrl.text = v.imageUrl;
       _remainingCtrl.text = v.remaining.toString();
       _termsCtrl.text = v.terms;
@@ -87,8 +88,7 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
                         const Text('Thông tin Voucher',
                             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2D))),
                         const Divider(height: 24),
-                        _field('Tiêu đề voucher', _titleCtrl, Icons.title, required: true),
-                        _field('Mô tả ngắn gọn', _subtitleCtrl, Icons.description_outlined, required: true),
+                        _field('Tên voucher (VD: Giảm 20K)', _nameCtrl, Icons.title, required: true),
                         _field('Mã voucher (VD: SAVE20)', _codeCtrl, Icons.local_offer_outlined, required: true, validator: (v) {
                           if (v != null && v.contains(' ')) return 'Mã không được chứa khoảng trắng';
                           return null;
@@ -134,15 +134,22 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
                               if (v != null && v.isNotEmpty && int.tryParse(v) == null) return 'Phải là số nguyên hợp lệ';
                               return null;
                             }),
-                        _field('Số điểm cần đổi', _pointsCtrl, Icons.stars_outlined,
-                            required: true,
-                            keyboardType: TextInputType.number,
-                            validator: (v) {
-                              if (v != null && v.isNotEmpty && int.tryParse(v) == null) return 'Phải là số nguyên hợp lệ';
-                              return null;
-                            }),
                         _field('Đường dẫn ảnh voucher (Tùy chọn)', _imageCtrl, Icons.image_outlined, required: false),
                         _field('Điều khoản sử dụng (Tùy chọn)', _termsCtrl, Icons.gavel_outlined, required: false, maxLines: 3),
+                        SwitchListTile(
+                          title: const Text('Freeship'),
+                          subtitle: const Text('Voucher này là voucher miễn phí vận chuyển'),
+                          value: _isFreeship,
+                          activeColor: const Color(0xFFFF6B35),
+                          onChanged: (val) => setState(() => _isFreeship = val),
+                        ),
+                        SwitchListTile(
+                          title: const Text('Kích hoạt'),
+                          subtitle: const Text('Cho phép sử dụng mã giảm giá này'),
+                          value: _isActive,
+                          activeColor: const Color(0xFFFF6B35),
+                          onChanged: (val) => setState(() => _isActive = val),
+                        ),
                       ],
                     ),
                   ),
@@ -276,7 +283,7 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
                 const Text('🎟 VOUCHER', style: TextStyle(color: Colors.white70, fontSize: 11)),
                 const SizedBox(height: 4),
                 Text(
-                  _titleCtrl.text.isEmpty ? 'Tiêu đề' : _titleCtrl.text,
+                  _nameCtrl.text.isEmpty ? 'Tên voucher' : _nameCtrl.text,
                   style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 Text(
@@ -387,16 +394,19 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
 
         final newVoucher = Voucher(
           storeId: storeId,
-          title: _titleCtrl.text.trim(),
-          subtitle: _subtitleCtrl.text.trim(),
+          name: _nameCtrl.text.trim(),
           code: _codeCtrl.text.trim().toUpperCase(),
           type: _discountType,
           value: double.parse(_valueCtrl.text.trim()),
-          pointsRequired: int.parse(_pointsCtrl.text.trim()),
+          pointsRequired: 0,
           imageUrl: _imageCtrl.text.trim(),
           remaining: int.parse(_remainingCtrl.text.trim()),
           terms: _termsCtrl.text.trim(),
           minOrderValue: double.parse(_minOrderCtrl.text.trim()),
+          limitCount: int.parse(_remainingCtrl.text.trim()),
+          isFreeship: _isFreeship,
+          isActive: _isActive,
+          usedCount: widget.isEdit ? VoucherFormPage.selectedVoucherToEdit!.usedCount : 0,
         );
 
         if (widget.isEdit && VoucherFormPage.selectedVoucherToEdit != null) {

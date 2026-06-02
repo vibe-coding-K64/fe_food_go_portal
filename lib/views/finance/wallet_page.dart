@@ -181,18 +181,18 @@ class _WalletPageState extends State<WalletPage> {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, color: color, size: 22),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, color: color, size: 28),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                const SizedBox(height: 4),
-                Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E1E2D))),
+                Text(label, style: const TextStyle(color: Colors.grey, fontSize: 15, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 6),
+                Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22, color: Color(0xFF1E1E2D))),
               ],
             ),
           ),
@@ -202,10 +202,10 @@ class _WalletPageState extends State<WalletPage> {
   }
 
   Widget _transactionRow(Transaction tx) {
-    final isCredit = tx.type == 'order_payment' || tx.type == 'delivery_income' || tx.type == 'refund';
+    final isCredit = tx.type == 1 || tx.type == 2 || tx.type == 4;
     final sign = isCredit ? '+' : '-';
     final amountStr = sign + _currencyFormat.format(tx.netAmount);
-    final timeStr = tx.createdAt != null ? DateFormat('HH:mm dd/MM').format(tx.createdAt!) : '';
+    final timeStr = tx.createdAt != null ? DateFormat('HH:mm dd/MM').format(tx.createdAt!.toLocal()) : '';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),

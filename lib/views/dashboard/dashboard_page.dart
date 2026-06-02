@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import '../../data/services/auth_service.dart';
+import '../../data/services/order_api_service.dart';
 
 // Lớp Mock cho OrderModel để giao diện hoạt động độc lập
 class OrderModel {
@@ -34,40 +37,83 @@ class _MyDashboardState extends State<MyDashboard> {
   Map<String, int> statusCount = {};
   List<OrderModel> recentOrders = [];
   List<OrderModel> allOrders = [];
+  List<MapEntry<String, int>> topProducts = [];
+  Timer? _pollingTimer;
 
   @override
   void initState() {
     super.initState();
     loadDashboard();
+    _startPolling();
   }
 
-  Future<void> loadDashboard() async {
-    // Giả lập dữ liệu đơn hàng
-    allOrders = [
-      OrderModel(id: 'OD001', orderDate: DateTime.now().subtract(const Duration(hours: 2)), itemCount: 3, orderStatus: 'delivered', totalAmount: 215000),
-      OrderModel(id: 'OD002', orderDate: DateTime.now().subtract(const Duration(hours: 5)), itemCount: 2, orderStatus: 'processing', totalAmount: 130000),
-      OrderModel(id: 'OD003', orderDate: DateTime.now().subtract(const Duration(hours: 8)), itemCount: 1, orderStatus: 'pending', totalAmount: 89000),
-      OrderModel(id: 'OD004', orderDate: DateTime.now().subtract(const Duration(days: 1)), itemCount: 4, orderStatus: 'delivered', totalAmount: 450000),
-      OrderModel(id: 'OD005', orderDate: DateTime.now().subtract(const Duration(days: 2)), itemCount: 2, orderStatus: 'cancelled', totalAmount: 12000),
-      OrderModel(id: 'OD006', orderDate: DateTime.now().subtract(const Duration(days: 3)), itemCount: 3, orderStatus: 'delivered', totalAmount: 310000),
-      OrderModel(id: 'OD007', orderDate: DateTime.now().subtract(const Duration(days: 4)), itemCount: 1, orderStatus: 'delivered', totalAmount: 95000),
-    ];
-
-    totalOrders = allOrders.length;
-    totalSale = allOrders.fold(0, (sum, order) => sum + order.totalAmount);
-    soldProducts = allOrders.fold(0, (sum, order) => sum + order.itemCount);
-    avgOrderValue = totalOrders == 0 ? 0 : totalSale / totalOrders;
-
-    statusCount.clear();
-    for (var order in allOrders) {
-      final status = order.orderStatus;
-      statusCount[status] = (statusCount[status] ?? 0) + 1;
-    }
-    recentOrders = allOrders.take(5).toList();
-
-    setState(() {
-      isLoading = false;
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) loadDashboard(isPolling: true);
     });
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> loadDashboard({bool isPolling = false}) async {
+    if (!isPolling && mounted) setState(() => isLoading = true);
+    try {
+      final storeId = await AuthService().getStoreId();
+      if (storeId == null) throw 'Không tìm thấy storeId';
+
+      final realOrders = await OrderApiService().getOrdersByStoreId(storeId);
+      
+      Map<String, int> itemCountsMap = {};
+      allOrders = realOrders.map((o) {
+        int itemsCount = 0;
+        for (var item in o.items) {
+          itemsCount += item.quantity;
+          itemCountsMap[item.name] = (itemCountsMap[item.name] ?? 0) + item.quantity;
+        }
+        // Tính doanh thu: Tổng tiền món ăn trừ đi voucher (không tính phí ship)
+        double income = o.totalAmount - o.discountAmount;
+        
+        return OrderModel(
+          id: o.id ?? '',
+          orderDate: o.createdAt ?? DateTime.now(),
+          itemCount: itemsCount,
+          orderStatus: o.status, 
+          totalAmount: income,
+        );
+      }).toList();
+
+      var sortedProducts = itemCountsMap.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      topProducts = sortedProducts.take(3).toList();
+
+      totalOrders = allOrders.length;
+      totalSale = allOrders.fold(0, (sum, order) => sum + order.totalAmount);
+      soldProducts = allOrders.fold(0, (sum, order) => sum + order.itemCount);
+      avgOrderValue = totalOrders == 0 ? 0 : totalSale / totalOrders;
+
+      statusCount.clear();
+      for (var order in allOrders) {
+        final status = order.orderStatus;
+        statusCount[status] = (statusCount[status] ?? 0) + 1;
+      }
+      
+      // Sắp xếp đơn hàng mới nhất lên đầu
+      allOrders.sort((a, b) => b.orderDate.compareTo(a.orderDate));
+      recentOrders = allOrders.take(5).toList();
+
+    } catch (e) {
+      debugPrint('Error loading dashboard: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   String money(double value) {
@@ -100,21 +146,21 @@ class _MyDashboardState extends State<MyDashboard> {
 
   Color getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'created':
+      case 'created': case 'mới tạo':
         return Colors.blue;
-      case 'pending':
+      case 'pending': case 'chờ xử lý': case 'chờ xác nhận':
         return Colors.orange;
-      case 'processing':
+      case 'processing': case 'đang chuẩn bị':
         return Colors.purple;
-      case 'shipped':
+      case 'shipped': case 'đang giao':
         return Colors.indigo;
-      case 'delivered':
+      case 'delivered': case 'đã giao': case 'hoàn thành':
         return Colors.green;
-      case 'cancelled':
+      case 'cancelled': case 'canceled': case 'đã hủy':
         return Colors.red;
-      case 'returned':
+      case 'returned': case 'trả hàng':
         return Colors.blueGrey;
-      case 'refunded':
+      case 'refunded': case 'hoàn tiền':
         return Colors.pink;
       default:
         return Colors.grey;
@@ -545,7 +591,23 @@ class _MyDashboardState extends State<MyDashboard> {
   }
 
   List<FlSpot> buildWeeklySpots() {
-    Map<int, double> weekdaySales = {1: 150000, 2: 230000, 3: 450000, 4: 95000, 5: 310000, 6: 180000, 7: 500000};
+    Map<int, double> weekdaySales = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0};
+    
+    DateTime now = DateTime.now();
+    DateTime startOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    startOfWeek = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
+    
+    for (var order in allOrders) {
+      // Chỉ tính đơn hoàn thành (nếu cần) hoặc tính tất cả tuỳ nghiệp vụ, 
+      // tạm thời tính tất cả những đơn không bị Huỷ
+      if (order.orderStatus != '4' && order.orderStatus.toLowerCase() != 'đã hủy') {
+        if (order.orderDate.isAfter(startOfWeek) || order.orderDate.isAtSameMomentAs(startOfWeek)) {
+          int weekday = order.orderDate.weekday; // 1 = T2, 7 = CN
+          weekdaySales[weekday] = (weekdaySales[weekday] ?? 0) + order.totalAmount;
+        }
+      }
+    }
+
     return List.generate(
       7,
       (index) => FlSpot(index.toDouble(), weekdaySales[index + 1]!),
@@ -570,15 +632,26 @@ class _MyDashboardState extends State<MyDashboard> {
   }
 
   Widget _buildTopProducts() {
-    return Column(
-      children: [
-        _topProductRow("Burger Bò Đặc Biệt", "342 lượt bán", "4.8/5", Colors.orange),
-        const Divider(height: 20),
-        _topProductRow("Pizza Hải Sản Cao Cấp", "285 lượt bán", "4.7/5", Colors.blue),
-        const Divider(height: 20),
-        _topProductRow("Gà Rán Giòn Cay", "198 lượt bán", "4.9/5", Colors.purple),
-      ],
-    );
+    if (topProducts.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20), 
+          child: Text("Chưa có đơn hàng nào")
+        )
+      );
+    }
+    List<Widget> children = [];
+    final colors = [Colors.orange, Colors.blue, Colors.purple];
+    for (int i = 0; i < topProducts.length; i++) {
+      children.add(_topProductRow(
+        topProducts[i].key, 
+        "${topProducts[i].value} lượt bán", 
+        "5.0/5", 
+        colors[i % colors.length]
+      ));
+      if (i < topProducts.length - 1) children.add(const Divider(height: 20));
+    }
+    return Column(children: children);
   }
 
   Widget _topProductRow(String name, String sales, String rating, Color color) {

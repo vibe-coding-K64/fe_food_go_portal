@@ -3,8 +3,7 @@ import 'package:intl/intl.dart';
 class Voucher {
   final String? id;
   final String? storeId;
-  final String title;
-  final String subtitle;
+  final String name;
   final String code;
   final int type; // 1: %, 2: cash
   final double value;
@@ -13,14 +12,16 @@ class Voucher {
   final int remaining;
   final String terms;
   final double minOrderValue;
-  final DateTime? createdAt;
-  final DateTime? updatedAt;
+  final int limitCount;
+  final int usedCount;
+  final DateTime? expiryDate;
+  final bool isActive;
+  final bool isFreeship;
 
   Voucher({
     this.id,
     this.storeId,
-    required this.title,
-    required this.subtitle,
+    required this.name,
     required this.code,
     required this.type,
     required this.value,
@@ -29,16 +30,18 @@ class Voucher {
     required this.remaining,
     required this.terms,
     required this.minOrderValue,
-    this.createdAt,
-    this.updatedAt,
+    required this.limitCount,
+    this.usedCount = 0,
+    this.expiryDate,
+    this.isActive = true,
+    this.isFreeship = false,
   });
 
   factory Voucher.fromJson(Map<String, dynamic> json) {
     return Voucher(
       id: json['id'],
       storeId: json['storeId'],
-      title: json['title'] ?? '',
-      subtitle: json['subtitle'] ?? '',
+      name: json['name'] ?? json['title'] ?? '',
       code: json['code'] ?? '',
       type: json['type'] ?? 1,
       value: (json['value'] ?? 0).toDouble(),
@@ -47,8 +50,11 @@ class Voucher {
       remaining: json['remaining'] ?? 0,
       terms: json['terms'] ?? '',
       minOrderValue: (json['minOrderValue'] ?? 0).toDouble(),
-      createdAt: _parseDate(json['createdAt']),
-      updatedAt: _parseDate(json['updatedAt']),
+      limitCount: json['limitCount'] ?? 0,
+      usedCount: json['usedCount'] ?? 0,
+      expiryDate: _parseDate(json['expiryDate']),
+      isActive: json['isActive'] ?? true,
+      isFreeship: json['isFreeship'] ?? false,
     );
   }
 
@@ -70,8 +76,7 @@ class Voucher {
     return {
       'id': id,
       'storeId': storeId,
-      'title': title,
-      'subtitle': subtitle,
+      'name': name,
       'code': code,
       'type': type,
       'value': value,
@@ -80,6 +85,11 @@ class Voucher {
       'remaining': remaining,
       'terms': terms,
       'minOrderValue': minOrderValue,
+      'limitCount': limitCount,
+      'usedCount': usedCount,
+      if (expiryDate != null) 'expiryDate': expiryDate!.toIso8601String(),
+      'isActive': isActive,
+      'isFreeship': isFreeship,
     };
   }
 
