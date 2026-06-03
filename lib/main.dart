@@ -1,19 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'firebase_options.dart';
 import 'routes/app_routes.dart';
 import 'controllers/theme_controller.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  usePathUrlStrategy();
+  await EasyLocalization.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(const MyApp());
+  runApp(
+    EasyLocalization(
+      supportedLocales: const [Locale('vi', ''), Locale('en', '')],
+      path: 'assets/translations',
+      fallbackLocale: const Locale('vi', ''),
+      startLocale: const Locale('vi', ''),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  static final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -29,6 +44,7 @@ class _MyAppState extends State<MyApp> {
       listenable: ThemeController.instance,
       builder: (context, child) {
         return MaterialApp.router(
+          scaffoldMessengerKey: MyApp.scaffoldMessengerKey,
           title: 'FoodGo Merchant Portal',
           debugShowCheckedModeBanner: false,
           themeMode: ThemeController.instance.themeMode,
@@ -57,6 +73,9 @@ class _MyAppState extends State<MyApp> {
             scaffoldBackgroundColor: const Color(0xFF121212),
             textTheme: ThemeData.dark().textTheme.apply(fontFamily: 'Inter'),
           ),
+          localizationsDelegates: context.localizationDelegates,
+          supportedLocales: context.supportedLocales,
+          locale: context.locale,
           routerDelegate: _routerDelegate,
           routeInformationParser: _routeParser,
         );

@@ -57,6 +57,8 @@ class Product {
   final List<ProductOptionGroup>? optionGroups;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final double rating;
+  final int reviewCount;
 
   Product({
     this.id,
@@ -72,6 +74,8 @@ class Product {
     this.optionGroups,
     this.createdAt,
     this.updatedAt,
+    this.rating = 0.0,
+    this.reviewCount = 0,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -89,6 +93,8 @@ class Product {
       optionGroups: (json['optionGroups'] as List?)?.map((item) => ProductOptionGroup.fromJson(item)).toList(),
       createdAt: _parseDate(json['createdAt']),
       updatedAt: _parseDate(json['updatedAt']),
+      rating: (json['rating'] ?? 0.0).toDouble(),
+      reviewCount: (json['reviewCount'] ?? 0).toInt(),
     );
   }
 

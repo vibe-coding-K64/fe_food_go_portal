@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../data/models/voucher_model.dart';
 import '../../data/services/voucher_api_service.dart';
 import '../../data/services/auth_service.dart';
+import '../../data/services/global_search_service.dart';
 import 'voucher_add_edit_page.dart';
 
 class VouchersPage extends StatefulWidget {
@@ -23,6 +24,17 @@ class _VouchersPageState extends State<VouchersPage> {
   void initState() {
     super.initState();
     _fetchVouchers();
+    GlobalSearchService().queryNotifier.addListener(_onSearchQueryChanged);
+  }
+
+  @override
+  void dispose() {
+    GlobalSearchService().queryNotifier.removeListener(_onSearchQueryChanged);
+    super.dispose();
+  }
+
+  void _onSearchQueryChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchVouchers() async {
@@ -87,6 +99,17 @@ class _VouchersPageState extends State<VouchersPage> {
     );
   }
 
+  List<Voucher> get _filtered {
+    final rawQuery = GlobalSearchService().queryNotifier.value;
+    final query = GlobalSearchService().removeDiacritics(rawQuery.toLowerCase().trim());
+    
+    return _vouchers.where((v) {
+      final code = GlobalSearchService().removeDiacritics(v.code.toLowerCase());
+      final title = GlobalSearchService().removeDiacritics(v.name.toLowerCase());
+      return query.isEmpty || code.contains(query) || title.contains(query);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -122,12 +145,12 @@ class _VouchersPageState extends State<VouchersPage> {
         Expanded(
           child: _isLoading 
               ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF6B35)))
-              : _vouchers.isEmpty
+              : _filtered.isEmpty
                   ? const Center(child: Text('Chưa có mã giảm giá nào'))
                   : ListView.separated(
-                      itemCount: _vouchers.length,
+                      itemCount: _filtered.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, i) => _buildVoucherCard(i, _vouchers[i]),
+                      itemBuilder: (context, i) => _buildVoucherCard(i, _filtered[i]),
                     ),
         ),
       ],

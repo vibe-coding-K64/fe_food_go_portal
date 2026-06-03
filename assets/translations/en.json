@@ -1,0 +1,34 @@
+{
+  "sidebar": {
+    "store": "STORE",
+    "dashboard": "Dashboard",
+    "storeInfo": "Store Info",
+    "menu": "MENU",
+    "categories": "Categories",
+    "products": "Products",
+    "business": "BUSINESS",
+    "orders": "Orders",
+    "vouchers": "Vouchers",
+    "reviews": "Reviews",
+    "finance": "FINANCE",
+    "wallet": "Wallet",
+    "transactions": "Transactions",
+    "withdrawal": "Withdrawal",
+    "support": "SUPPORT",
+    "chat": "Customer Chat",
+    "notifications": "Notifications",
+    "reports": "Report Tickets",
+    "account": "ACCOUNT",
+    "profile": "Profile",
+    "settings": "Settings"
+  },
+  "appbar": {
+    "search": "Search...",
+    "language": "Language",
+    "orders": "Orders",
+    "settings": "Settings",
+    "notifications": "Notifications",
+    "profileInfo": "Profile Info",
+    "logout": "Logout"
+  }
+}

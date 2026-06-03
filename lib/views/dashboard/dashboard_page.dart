@@ -4,21 +4,26 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../../data/services/auth_service.dart';
 import '../../data/services/order_api_service.dart';
+import '../../data/services/product_api_service.dart';
 
 // Lớp Mock cho OrderModel để giao diện hoạt động độc lập
 class OrderModel {
   final String id;
+  final String code;
   final DateTime orderDate;
   final int itemCount;
   final String orderStatus;
   final double totalAmount;
+  final int paymentStatus;
 
   OrderModel({
     required this.id,
+    required this.code,
     required this.orderDate,
     required this.itemCount,
     required this.orderStatus,
     required this.totalAmount,
+    required this.paymentStatus,
   });
 }
 
@@ -37,7 +42,8 @@ class _MyDashboardState extends State<MyDashboard> {
   Map<String, int> statusCount = {};
   List<OrderModel> recentOrders = [];
   List<OrderModel> allOrders = [];
-  List<MapEntry<String, int>> topProducts = [];
+  List<Map<String, dynamic>> topProducts = [];
+  String _chartPeriod = 'Tuần';
   Timer? _pollingTimer;
 
   @override
@@ -66,34 +72,50 @@ class _MyDashboardState extends State<MyDashboard> {
       if (storeId == null) throw 'Không tìm thấy storeId';
 
       final realOrders = await OrderApiService().getOrdersByStoreId(storeId);
+      final storeProducts = await ProductApiService().getAllProducts(storeId);
       
-      Map<String, int> itemCountsMap = {};
+      Map<String, Map<String, dynamic>> itemCountsMap = {};
+      
       allOrders = realOrders.map((o) {
         int itemsCount = 0;
         for (var item in o.items) {
           itemsCount += item.quantity;
-          itemCountsMap[item.name] = (itemCountsMap[item.name] ?? 0) + item.quantity;
+          
+          if (!itemCountsMap.containsKey(item.name)) {
+            // Find product in storeProducts
+            final matchedProd = storeProducts.where((p) => p.name == item.name).firstOrNull;
+            itemCountsMap[item.name] = {
+              'name': item.name,
+              'sales': 0,
+              'imageUrl': matchedProd?.imageUrl ?? item.imageUrl, // Fallback to item image
+              'rating': matchedProd?.rating ?? 5.0, // Default to 5.0 if not found
+            };
+          }
+          itemCountsMap[item.name]!['sales'] = (itemCountsMap[item.name]!['sales'] as int) + item.quantity;
         }
         // Tính doanh thu: Tổng tiền món ăn trừ đi voucher (không tính phí ship)
         double income = o.totalAmount - o.discountAmount;
         
         return OrderModel(
           id: o.id ?? '',
+          code: o.code,
           orderDate: o.createdAt ?? DateTime.now(),
           itemCount: itemsCount,
           orderStatus: o.status, 
           totalAmount: income,
+          paymentStatus: o.paymentStatus,
         );
       }).toList();
 
-      var sortedProducts = itemCountsMap.entries.toList()
-        ..sort((a, b) => b.value.compareTo(a.value));
+      var sortedProducts = itemCountsMap.values.toList()
+        ..sort((a, b) => (b['sales'] as int).compareTo(a['sales'] as int));
       topProducts = sortedProducts.take(3).toList();
 
       totalOrders = allOrders.length;
-      totalSale = allOrders.fold(0, (sum, order) => sum + order.totalAmount);
-      soldProducts = allOrders.fold(0, (sum, order) => sum + order.itemCount);
-      avgOrderValue = totalOrders == 0 ? 0 : totalSale / totalOrders;
+      final completedPaidOrders = allOrders.where((o) => (o.orderStatus == 'Hoàn thành' || o.orderStatus == '3') && o.paymentStatus == 2).toList();
+      totalSale = completedPaidOrders.fold(0, (sum, order) => sum + order.totalAmount);
+      soldProducts = completedPaidOrders.fold(0, (sum, order) => sum + order.itemCount);
+      avgOrderValue = completedPaidOrders.isEmpty ? 0 : totalSale / completedPaidOrders.length;
 
       statusCount.clear();
       for (var order in allOrders) {
@@ -118,6 +140,13 @@ class _MyDashboardState extends State<MyDashboard> {
 
   String money(double value) {
     return NumberFormat("#,###").format(value);
+  }
+
+  String formatCompact(double value) {
+    if (value >= 1000000000) return '${(value / 1000000000).toStringAsFixed(value % 1000000000 == 0 ? 0 : 1)}B';
+    if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(value % 1000000 == 0 ? 0 : 1)}M';
+    if (value >= 1000) return '${(value / 1000).toStringAsFixed(value % 1000 == 0 ? 0 : 1)}k';
+    return value.toStringAsFixed(0);
   }
 
   String translateStatus(String status) {
@@ -260,7 +289,34 @@ class _MyDashboardState extends State<MyDashboard> {
                   child: Column(
                     children: [
                       cardContainer(
-                        title: "Phân Tích Doanh Thu Tuần",
+                        title: "Phân Tích Doanh Thu",
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: _chartPeriod,
+                              isDense: true,
+                              items: ['Tuần', 'Tháng', 'Năm'].map((String value) {
+                                return DropdownMenuItem<String>(
+                                  value: value,
+                                  child: Text(value, style: const TextStyle(fontSize: 14)),
+                                );
+                              }).toList(),
+                              onChanged: (newValue) {
+                                if (newValue != null) {
+                                  setState(() {
+                                    _chartPeriod = newValue;
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                        ),
                         child: SizedBox(
                           height: 300,
                           child: LineChart(mainLineData()),
@@ -314,7 +370,7 @@ class _MyDashboardState extends State<MyDashboard> {
                                   (o) => DataRow(
                                     cells: [
                                       DataCell(
-                                        Text("#${o.id}"),
+                                        Text("#${o.code}"),
                                       ),
                                       DataCell(
                                         Text(
@@ -328,11 +384,25 @@ class _MyDashboardState extends State<MyDashboard> {
                                       ),
                                       DataCell(statusChip(translateStatus(o.orderStatus))),
                                       DataCell(
-                                        Text(
-                                          "${money(o.totalAmount)}đ",
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                        Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              "${money(o.totalAmount)}đ",
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            Text(
+                                              o.paymentStatus == 2 ? 'Đã thanh toán' : 'Chưa thanh toán',
+                                              style: TextStyle(
+                                                color: o.paymentStatus == 2 ? Colors.green : Colors.orange,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ],
@@ -448,7 +518,7 @@ class _MyDashboardState extends State<MyDashboard> {
     );
   }
 
-  Widget cardContainer({required String title, required Widget child}) {
+  Widget cardContainer({required String title, required Widget child, Widget? trailing}) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -465,13 +535,19 @@ class _MyDashboardState extends State<MyDashboard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF2D3238),
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2D3238),
+                ),
+              ),
+              if (trailing != null) trailing,
+            ],
           ),
           const SizedBox(height: 20),
           child,
@@ -530,6 +606,7 @@ class _MyDashboardState extends State<MyDashboard> {
   /// ===== DATA & CHARTS =====
   LineChartData mainLineData() {
     return LineChartData(
+      minY: 0,
       gridData: FlGridData(
         show: true,
         drawVerticalLine: false,
@@ -542,24 +619,35 @@ class _MyDashboardState extends State<MyDashboard> {
         leftTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
-            reservedSize: 40,
-            getTitlesWidget: (value, meta) => Text(
-              money(value),
-              style: const TextStyle(color: Colors.grey, fontSize: 10),
-            ),
+            reservedSize: 50,
+            getTitlesWidget: (value, meta) {
+              if (value == meta.max) return const SizedBox(); // Prevent overlapping at the top
+              return Text(
+                formatCompact(value),
+                style: const TextStyle(color: Colors.grey, fontSize: 10),
+              );
+            },
           ),
         ),
         bottomTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
+            interval: 1, // Fix repeating labels
             getTitlesWidget: (value, meta) {
-              const days = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
-              if (value.toInt() >= 0 && value.toInt() < days.length) {
+              List<String> titles;
+              if (_chartPeriod == 'Năm') {
+                titles = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"];
+              } else if (_chartPeriod == 'Tháng') {
+                titles = ["Tuần 1", "Tuần 2", "Tuần 3", "Tuần 4"];
+              } else {
+                titles = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+              }
+              if (value.toInt() >= 0 && value.toInt() < titles.length) {
                 return Padding(
                   padding: const EdgeInsets.only(top: 10),
                   child: Text(
-                    days[value.toInt()],
-                    style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                    titles[value.toInt()],
+                    style: TextStyle(color: Colors.grey[500], fontSize: 11),
                   ),
                 );
               }
@@ -571,8 +659,9 @@ class _MyDashboardState extends State<MyDashboard> {
       borderData: FlBorderData(show: false),
       lineBarsData: [
         LineChartBarData(
-          spots: buildWeeklySpots(),
+          spots: buildChartSpots(),
           isCurved: true,
+          preventCurveOverShooting: true,
           gradient: const LinearGradient(colors: [Colors.blue, Colors.cyan]),
           barWidth: 4,
           dotData: FlDotData(show: true),
@@ -590,6 +679,40 @@ class _MyDashboardState extends State<MyDashboard> {
     );
   }
 
+  List<FlSpot> buildChartSpots() {
+    if (_chartPeriod == 'Năm') return buildYearlySpots();
+    if (_chartPeriod == 'Tháng') return buildMonthlySpots();
+    return buildWeeklySpots();
+  }
+
+  List<FlSpot> buildYearlySpots() {
+    Map<int, double> monthlySales = {for (int i = 1; i <= 12; i++) i: 0};
+    DateTime now = DateTime.now();
+    for (var order in allOrders) {
+      if ((order.orderStatus == 'Hoàn thành' || order.orderStatus == '3') && order.paymentStatus == 2) {
+        if (order.orderDate.year == now.year) {
+          monthlySales[order.orderDate.month] = (monthlySales[order.orderDate.month] ?? 0) + order.totalAmount;
+        }
+      }
+    }
+    return List.generate(12, (index) => FlSpot(index.toDouble(), monthlySales[index + 1]!));
+  }
+
+  List<FlSpot> buildMonthlySpots() {
+    Map<int, double> weeklySales = {1: 0, 2: 0, 3: 0, 4: 0};
+    DateTime now = DateTime.now();
+    for (var order in allOrders) {
+      if ((order.orderStatus == 'Hoàn thành' || order.orderStatus == '3') && order.paymentStatus == 2) {
+        if (order.orderDate.year == now.year && order.orderDate.month == now.month) {
+          int week = ((order.orderDate.day - 1) / 7).floor() + 1;
+          if (week > 4) week = 4; // Group days 29, 30, 31 into week 4
+          weeklySales[week] = (weeklySales[week] ?? 0) + order.totalAmount;
+        }
+      }
+    }
+    return List.generate(4, (index) => FlSpot(index.toDouble(), weeklySales[index + 1]!));
+  }
+
   List<FlSpot> buildWeeklySpots() {
     Map<int, double> weekdaySales = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0};
     
@@ -598,9 +721,7 @@ class _MyDashboardState extends State<MyDashboard> {
     startOfWeek = DateTime(startOfWeek.year, startOfWeek.month, startOfWeek.day);
     
     for (var order in allOrders) {
-      // Chỉ tính đơn hoàn thành (nếu cần) hoặc tính tất cả tuỳ nghiệp vụ, 
-      // tạm thời tính tất cả những đơn không bị Huỷ
-      if (order.orderStatus != '4' && order.orderStatus.toLowerCase() != 'đã hủy') {
+      if ((order.orderStatus == 'Hoàn thành' || order.orderStatus == '3') && order.paymentStatus == 2) {
         if (order.orderDate.isAfter(startOfWeek) || order.orderDate.isAtSameMomentAs(startOfWeek)) {
           int weekday = order.orderDate.weekday; // 1 = T2, 7 = CN
           weekdaySales[weekday] = (weekdaySales[weekday] ?? 0) + order.totalAmount;
@@ -643,18 +764,20 @@ class _MyDashboardState extends State<MyDashboard> {
     List<Widget> children = [];
     final colors = [Colors.orange, Colors.blue, Colors.purple];
     for (int i = 0; i < topProducts.length; i++) {
+      final p = topProducts[i];
       children.add(_topProductRow(
-        topProducts[i].key, 
-        "${topProducts[i].value} lượt bán", 
-        "5.0/5", 
-        colors[i % colors.length]
+        p['name'], 
+        "${p['sales']} lượt bán", 
+        "${p['rating']}/5", 
+        colors[i % colors.length],
+        p['imageUrl']
       ));
       if (i < topProducts.length - 1) children.add(const Divider(height: 20));
     }
     return Column(children: children);
   }
 
-  Widget _topProductRow(String name, String sales, String rating, Color color) {
+  Widget _topProductRow(String name, String sales, String rating, Color color, String? imageUrl) {
     return Row(
       children: [
         Container(
@@ -664,7 +787,12 @@ class _MyDashboardState extends State<MyDashboard> {
             color: color.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(Icons.fastfood, color: color),
+          child: imageUrl != null && imageUrl.isNotEmpty 
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(imageUrl, fit: BoxFit.cover),
+              )
+            : Icon(Icons.fastfood, color: color),
         ),
         const SizedBox(width: 15),
         Expanded(

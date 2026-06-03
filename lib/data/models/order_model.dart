@@ -80,6 +80,7 @@ class Order {
   final double discountAmount;
   final double finalAmount;
   final String paymentMethod;
+  final int paymentStatus;
   final String status;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -106,6 +107,7 @@ class Order {
     required this.discountAmount,
     required this.finalAmount,
     required this.paymentMethod,
+    this.paymentStatus = 1,
     required this.status,
     this.createdAt,
     this.updatedAt,
@@ -144,6 +146,7 @@ class Order {
       discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0.0,
       finalAmount: (json['finalAmount'] as num?)?.toDouble() ?? 0.0,
       paymentMethod: _parsePaymentMethod(json['paymentMethod']),
+      paymentStatus: json['paymentStatus'] as int? ?? 1,
       status: parsedStatus,
       createdAt: json['createdAt'] != null ? DateTime.parse(json['createdAt']) : null,
       updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
@@ -200,6 +203,7 @@ class Order {
       'discountAmount': discountAmount,
       'finalAmount': finalAmount,
       'paymentMethod': paymentMethodValue,
+      'paymentStatus': paymentStatus,
       'status': statusValue,
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
