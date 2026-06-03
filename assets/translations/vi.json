@@ -1,0 +1,34 @@
+{
+  "sidebar": {
+    "store": "GIAN HÀNG",
+    "dashboard": "Bảng điều khiển",
+    "storeInfo": "Thông tin quán",
+    "menu": "THỰC ĐƠN",
+    "categories": "Danh mục món",
+    "products": "Món ăn",
+    "business": "KINH DOANH",
+    "orders": "Đơn hàng",
+    "vouchers": "Mã giảm giá",
+    "reviews": "Đánh giá",
+    "finance": "TÀI CHÍNH",
+    "wallet": "Ví doanh thu",
+    "transactions": "Lịch sử giao dịch",
+    "withdrawal": "Rút tiền",
+    "support": "HỖ TRỢ",
+    "chat": "Chat khách hàng",
+    "notifications": "Thông báo",
+    "reports": "Khiếu nại",
+    "account": "TÀI KHOẢN",
+    "profile": "Hồ sơ",
+    "settings": "Cài đặt"
+  },
+  "appbar": {
+    "search": "Tìm kiếm...",
+    "language": "Ngôn ngữ",
+    "orders": "Đơn hàng",
+    "settings": "Cài đặt",
+    "notifications": "Thông báo",
+    "profileInfo": "Thông tin cá nhân",
+    "logout": "Đăng xuất"
+  }
+}

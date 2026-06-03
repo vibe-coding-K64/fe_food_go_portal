@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../data/models/order_model.dart';
 import '../../data/services/order_api_service.dart';
 import '../../data/services/auth_service.dart';
+import '../../data/services/global_search_service.dart';
 import 'order_detail_page.dart';
 
 class OrdersPage extends StatefulWidget {
@@ -31,6 +32,7 @@ class _OrdersPageState extends State<OrdersPage> {
     super.initState();
     _fetchOrders();
     _startPolling();
+    GlobalSearchService().queryNotifier.addListener(_onSearchQueryChanged);
   }
 
   void _startPolling() {
@@ -42,7 +44,12 @@ class _OrdersPageState extends State<OrdersPage> {
   @override
   void dispose() {
     _pollingTimer?.cancel();
+    GlobalSearchService().queryNotifier.removeListener(_onSearchQueryChanged);
     super.dispose();
+  }
+
+  void _onSearchQueryChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchOrders({bool isPolling = false}) async {
@@ -141,9 +148,20 @@ class _OrdersPageState extends State<OrdersPage> {
     );
   }
 
-  List<Order> get _filtered => _filterStatus == 'Tất cả'
-      ? _orders
-      : _orders.where((o) => o.status == _filterStatus).toList();
+  List<Order> get _filtered {
+    final rawQuery = GlobalSearchService().queryNotifier.value;
+    final query = GlobalSearchService().removeDiacritics(rawQuery.toLowerCase().trim());
+    
+    final filteredByStatus = _filterStatus == 'Tất cả'
+        ? _orders
+        : _orders.where((o) => o.status == _filterStatus).toList();
+        
+    return filteredByStatus.where((o) {
+      final code = GlobalSearchService().removeDiacritics((o.code ?? "").toLowerCase());
+      final name = GlobalSearchService().removeDiacritics((o.receiverName).toLowerCase());
+      return query.isEmpty || code.contains(query) || name.contains(query);
+    }).toList();
+  }
 
   List<Order> get _pagedOrders {
     int start = (_currentPage - 1) * _itemsPerPage;
@@ -197,8 +215,8 @@ class _OrdersPageState extends State<OrdersPage> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(24),
                     side: BorderSide(
-                      color: isSelected ? color : color.withOpacity(0.3),
-                      width: 1.5,
+                      color: isSelected ? Colors.transparent : color, // Viền đậm màu theo trạng thái
+                      width: 1.0,
                     ),
                   ),
                   elevation: 0,
@@ -322,8 +340,20 @@ class _OrdersPageState extends State<OrdersPage> {
                   const Text('Tổng tiền', style: TextStyle(color: Colors.grey, fontSize: 12)),
                   const SizedBox(height: 4),
                   Text(
-                    '${order.totalAmount.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}đ',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87),
+                    '${order.finalAmount.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}đ',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF1E1E2D)),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: order.paymentStatus == 2 ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      order.paymentStatus == 2 ? 'Đã thanh toán' : 'Chưa thanh toán',
+                      style: TextStyle(color: order.paymentStatus == 2 ? Colors.green : Colors.orange, fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ],
               ),

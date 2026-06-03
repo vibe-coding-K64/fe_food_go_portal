@@ -2,19 +2,23 @@ import 'package:flutter/material.dart';
 import '../../data/services/auth_service.dart';
 import '../../data/services/store_api_service.dart';
 import '../../data/services/notification_service.dart';
- 
-class AdminAppBar extends StatefulWidget implements PreferredSizeWidget { 
+import '../../data/services/order_api_service.dart';
+import '../../data/services/product_api_service.dart';
+import '../../data/services/global_search_service.dart';
+import 'package:easy_localization/easy_localization.dart';
+
+class MerchantAppBar extends StatefulWidget implements PreferredSizeWidget { 
   final Function(String)? onNavigate;
-  const AdminAppBar({super.key, this.onNavigate}); 
+  const MerchantAppBar({super.key, this.onNavigate}); 
 
   @override 
-  State<AdminAppBar> createState() => _AdminAppBarState(); 
+  State<MerchantAppBar> createState() => _MerchantAppBarState(); 
 
   @override 
   Size get preferredSize => const Size.fromHeight(65); 
 } 
 
-class _AdminAppBarState extends State<AdminAppBar> {
+class _MerchantAppBarState extends State<MerchantAppBar> {
   String _fullName = "";
   String _avatarInitials = "";
   String? _photoUrl;
@@ -73,33 +77,80 @@ class _AdminAppBarState extends State<AdminAppBar> {
             flex: 2, 
             child: Padding(
               padding: const EdgeInsets.only(left: 16.0),
-              child: Container( 
-                height: 42, 
-                decoration: BoxDecoration( 
-                  color: Colors.grey[50], 
-                  borderRadius: BorderRadius.circular(12), 
-                  border: Border.all(color: Colors.grey[200]!), 
-                ), 
-                child: TextField( 
-                  decoration: InputDecoration( 
-                    hintText: "Tìm kiếm hệ thống...", 
-                    hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14), 
-                    prefixIcon: Icon( 
-                      Icons.search, 
-                      color: Colors.grey[400], 
-                      size: 20, 
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return Container( 
+                    height: 42, 
+                    decoration: BoxDecoration( 
+                      color: Colors.white, 
+                      borderRadius: BorderRadius.circular(12), 
+                      border: Border.all(color: Colors.grey[300]!), 
                     ), 
-                    border: InputBorder.none, 
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10), 
-                  ), 
-                ), 
+                    child: TextField(
+                      onChanged: (value) {
+                        GlobalSearchService().updateQuery(value);
+                      },
+                      style: const TextStyle(color: Colors.black87, fontSize: 14),
+                      decoration: InputDecoration(
+                        hintText: 'appbar.search'.tr(),
+                        hintStyle: TextStyle(color: Colors.grey[500], fontSize: 14),
+                        prefixIcon: Icon(
+                          Icons.search,
+                          color: Colors.grey[500],
+                          size: 20,
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                      ),
+                    ),
+                  );
+                }
               ), 
             ),
           ), 
  
           const Spacer(flex: 1), // Tạo khoảng trống giữa search và icons 
           ///ACTIONS GROUP 
-          _buildActionButton(Icons.language, "Ngôn ngữ", () {}), 
+          PopupMenuButton<String>(
+            tooltip: 'appbar.language'.tr(),
+            offset: const Offset(0, 45),
+            color: Colors.white,
+            surfaceTintColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 4),
+              child: Icon(Icons.language, color: Colors.black54, size: 22),
+            ),
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'vi',
+                child: Row(
+                  children: [
+                    const Text("🇻🇳", style: TextStyle(fontSize: 18)),
+                    const SizedBox(width: 8),
+                    Text("Tiếng Việt", style: TextStyle(fontWeight: context.locale.languageCode == 'vi' ? FontWeight.bold : FontWeight.normal)),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'en',
+                child: Row(
+                  children: [
+                    const Text("🇬🇧", style: TextStyle(fontSize: 18)),
+                    const SizedBox(width: 8),
+                    Text("English", style: TextStyle(fontWeight: context.locale.languageCode == 'en' ? FontWeight.bold : FontWeight.normal)),
+                  ],
+                ),
+              ),
+            ],
+            onSelected: (value) {
+              if (value == 'vi') {
+                context.setLocale(const Locale('vi', ''));
+              } else {
+                context.setLocale(const Locale('en', ''));
+              }
+            },
+          ), 
           ValueListenableBuilder<int>(
             valueListenable: NotificationService().unreadCountNotifier,
             builder: (context, count, child) {
@@ -108,7 +159,7 @@ class _AdminAppBarState extends State<AdminAppBar> {
                 children: [
                   _buildActionButton(
                     Icons.notifications_none_outlined, 
-                    "Thông báo", 
+                    'appbar.notifications'.tr(), 
                     () {
                       if (widget.onNavigate != null) widget.onNavigate!('/notifications');
                     }, 
@@ -133,10 +184,36 @@ class _AdminAppBarState extends State<AdminAppBar> {
               );
             },
           ),
-          _buildActionButton(Icons.shopping_cart_outlined, "Đơn hàng", () {
-            if (widget.onNavigate != null) widget.onNavigate!('/orders');
-          }), 
-          _buildActionButton(Icons.settings_outlined, "Cài đặt", () {
+          ValueListenableBuilder<int>(
+            valueListenable: OrderBadgeService().pendingCountNotifier,
+            builder: (context, count, child) {
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  _buildActionButton(Icons.shopping_cart_outlined, 'appbar.orders'.tr(), () {
+                    if (widget.onNavigate != null) widget.onNavigate!('/orders');
+                  }),
+                  if (count > 0)
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Colors.orange,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          count > 99 ? '99+' : count.toString(),
+                          style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          _buildActionButton(Icons.settings_outlined, 'appbar.settings'.tr(), () {
             if (widget.onNavigate != null) widget.onNavigate!('/settings');
           }), 
  
@@ -211,14 +288,14 @@ class _AdminAppBarState extends State<AdminAppBar> {
               _buildPopupItem( 
                 "profile", 
                 Icons.person_outline, 
-                "Thông tin cá nhân", 
+                'appbar.profileInfo'.tr(), 
               ), 
-              _buildPopupItem("settings", Icons.settings_outlined, "Cài đặt"), 
+              _buildPopupItem("settings", Icons.settings_outlined, 'appbar.settings'.tr()), 
               const PopupMenuDivider(), 
               _buildPopupItem( 
                 "logout", 
                 Icons.logout, 
-                "Đăng xuất", 
+                'appbar.logout'.tr(), 
                 color: Colors.red, 
               ), 
             ], 

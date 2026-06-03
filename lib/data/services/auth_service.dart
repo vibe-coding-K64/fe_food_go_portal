@@ -26,12 +26,7 @@ class AuthService {
     if (token != null) {
       authStateNotifier.value = true;
     } else {
-      // Tự động đăng nhập vào tài khoản user_004 (Lưu Nghĩa) để bỏ qua màn hình Login
-      try {
-        await login('luudinhnghia30012005@gmail.com', 'nghia123');
-      } catch (e) {
-        print('Auto login failed: $e');
-      }
+      authStateNotifier.value = false;
     }
   }
 

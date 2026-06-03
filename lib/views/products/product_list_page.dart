@@ -3,6 +3,7 @@ import '../../data/models/product_model.dart';
 import '../../data/services/product_api_service.dart';
 import '../../data/services/category_api_service.dart';
 import '../../data/services/auth_service.dart';
+import '../../data/services/global_search_service.dart';
 import 'product_add_edit_page.dart';
 
 class ProductListPage extends StatefulWidget {
@@ -26,6 +27,17 @@ class _ProductListPageState extends State<ProductListPage> {
   void initState() {
     super.initState();
     _fetchData();
+    GlobalSearchService().queryNotifier.addListener(_onSearchQueryChanged);
+  }
+
+  @override
+  void dispose() {
+    GlobalSearchService().queryNotifier.removeListener(_onSearchQueryChanged);
+    super.dispose();
+  }
+
+  void _onSearchQueryChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchData() async {
@@ -95,9 +107,17 @@ class _ProductListPageState extends State<ProductListPage> {
     );
   }
 
-  List<Product> get _filtered => _filterCategory == 'Tất cả'
-      ? _products
-      : _products.where((p) => p.categoryName == _filterCategory).toList();
+  List<Product> get _filtered {
+    final rawQuery = GlobalSearchService().queryNotifier.value;
+    final query = GlobalSearchService().removeDiacritics(rawQuery.toLowerCase().trim());
+    
+    return _products.where((p) {
+      final matchesCategory = _filterCategory == 'Tất cả' || p.categoryName == _filterCategory;
+      final pName = GlobalSearchService().removeDiacritics(p.name.toLowerCase());
+      final matchesSearch = query.isEmpty || pName.contains(query);
+      return matchesCategory && matchesSearch;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {

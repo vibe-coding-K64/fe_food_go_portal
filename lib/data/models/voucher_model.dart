@@ -38,6 +38,13 @@ class Voucher {
   });
 
   factory Voucher.fromJson(Map<String, dynamic> json) {
+    int parsedLimit = json['limitCount'] ?? 0;
+    int parsedRemaining = json['remaining'] ?? 0;
+    int parsedUsed = json['usedCount'] ?? 0;
+    if (parsedUsed == 0 && parsedRemaining < parsedLimit) {
+      parsedUsed = parsedLimit - parsedRemaining;
+    }
+    
     return Voucher(
       id: json['id'],
       storeId: json['storeId'],
@@ -47,11 +54,11 @@ class Voucher {
       value: (json['value'] ?? 0).toDouble(),
       pointsRequired: json['pointsRequired'] ?? 0,
       imageUrl: json['imageUrl'] ?? '',
-      remaining: json['remaining'] ?? 0,
+      remaining: parsedRemaining,
       terms: json['terms'] ?? '',
       minOrderValue: (json['minOrderValue'] ?? 0).toDouble(),
-      limitCount: json['limitCount'] ?? 0,
-      usedCount: json['usedCount'] ?? 0,
+      limitCount: parsedLimit,
+      usedCount: parsedUsed,
       expiryDate: _parseDate(json['expiryDate']),
       isActive: json['isActive'] ?? true,
       isFreeship: json['isFreeship'] ?? false,

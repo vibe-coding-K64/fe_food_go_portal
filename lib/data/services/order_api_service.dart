@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'auth_service.dart';
 import '../models/order_model.dart';
 import 'api_constants.dart';
@@ -58,6 +60,56 @@ class OrderApiService {
       await _dio.post('/stores/orders/$orderId/confirm');
     } catch (e) {
       throw Exception('Failed to confirm order: $e');
+    }
+  }
+}
+
+class OrderBadgeService {
+  static final OrderBadgeService _instance = OrderBadgeService._internal();
+  factory OrderBadgeService() => _instance;
+
+  final ValueNotifier<int> pendingCountNotifier = ValueNotifier(0);
+  Timer? _pollingTimer;
+  final OrderApiService _apiService = OrderApiService();
+
+  OrderBadgeService._internal() {
+    AuthService.authStateNotifier.addListener(_onAuthStateChanged);
+    _startPolling();
+  }
+
+  void _onAuthStateChanged() {
+    if (AuthService.authStateNotifier.value) {
+      fetchPendingCount();
+    } else {
+      pendingCountNotifier.value = 0;
+    }
+  }
+
+  void _startPolling() {
+    fetchPendingCount();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (AuthService.authStateNotifier.value) {
+        fetchPendingCount();
+      }
+    });
+  }
+
+  void dispose() {
+    _pollingTimer?.cancel();
+  }
+
+  Future<void> fetchPendingCount() async {
+    try {
+      if (!AuthService.authStateNotifier.value) return;
+      final storeId = await AuthService().getStoreId();
+      if (storeId != null) {
+        final orders = await _apiService.getOrdersByStoreId(storeId);
+        // Trạng thái 0 là chờ xác nhận - dùng statusValue vì status là String
+        final count = orders.where((o) => o.statusValue == 0).length;
+        pendingCountNotifier.value = count;
+      }
+    } catch (e) {
+      // ignore
     }
   }
 }
