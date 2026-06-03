@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import '../main.dart';
 
 import '../views/auth/login_page.dart';
-import '../views/layout/admin_layout.dart';
+import '../views/layout/merchant_layout.dart';
 import '../views/dashboard/dashboard_page.dart';
 
 // Import các views mới tạo của Merchant Portal
@@ -33,7 +34,7 @@ class AppRouterDelegate extends RouterDelegate<String>
   late Future<String?> _storeIdFuture;
 
   AppRouterDelegate()
-      : navigatorKey = GlobalKey<NavigatorState>() {
+      : navigatorKey = MyApp.navigatorKey {
     _storeIdFuture = AuthService().getStoreId();
     AuthService.authStateNotifier.addListener(() {
       _storeIdFuture = AuthService().getStoreId();
@@ -274,7 +275,7 @@ class AppRouterDelegate extends RouterDelegate<String>
               key: navigatorKey,
               pages: [
                 MaterialPage(
-                  child: AdminLayout(
+                  child: MerchantLayout(
                     currentRoute: _currentPath,
                     onNavigate: (path) {
                       _currentPath = path;
@@ -303,11 +304,19 @@ class AppRouteParser extends RouteInformationParser<String> {
   Future<String> parseRouteInformation(
     RouteInformation routeInformation,
   ) async {
-    return routeInformation.location ?? "/dashboard";
+    final location = routeInformation.location ?? "/merchant/dashboard";
+    if (location.startsWith('/merchant')) {
+      final path = location.substring(9);
+      return path.isEmpty ? "/dashboard" : path;
+    }
+    return location == "/" ? "/dashboard" : location;
   }
 
   @override
   RouteInformation restoreRouteInformation(String configuration) {
+    if (!configuration.startsWith('/merchant')) {
+      return RouteInformation(location: '/merchant$configuration');
+    }
     return RouteInformation(location: configuration);
   }
 }

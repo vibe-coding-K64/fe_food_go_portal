@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart'; 
 import 'sidebar.dart'; 
-import 'admin_appbar.dart'; 
+import 'merchant_appbar.dart'; 
  
-class AdminLayout extends StatefulWidget { 
+class MerchantLayout extends StatefulWidget { 
   final Widget child; 
   final Function(String) onNavigate; 
   final String currentRoute; 
-  const AdminLayout({ 
+  const MerchantLayout({ 
     super.key, 
     required this.child, 
     required this.onNavigate, 
     required this.currentRoute, 
   }); 
   @override 
-  State<AdminLayout> createState() => _AdminLayoutState(); 
+  State<MerchantLayout> createState() => _MerchantLayoutState(); 
 } 
  
-class _AdminLayoutState extends State<AdminLayout> { 
+class _MerchantLayoutState extends State<MerchantLayout> { 
   @override 
   Widget build(BuildContext context) { 
     return Scaffold( 
@@ -31,7 +31,7 @@ class _AdminLayoutState extends State<AdminLayout> {
               children: [
                 SizedBox(
                   height: 57,
-                  child: AdminAppBar(onNavigate: widget.onNavigate),
+                  child: MerchantAppBar(onNavigate: widget.onNavigate),
                 ),
                 Expanded(
                   child: Container( 

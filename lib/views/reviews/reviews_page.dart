@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../data/models/store_model.dart';
 import '../../data/services/store_api_service.dart';
 import '../../data/services/auth_service.dart';
+import '../../data/services/global_search_service.dart';
 class ReviewsPage extends StatefulWidget {
   const ReviewsPage({super.key});
 
@@ -31,6 +32,18 @@ class _ReviewsPageState extends State<ReviewsPage> {
   void initState() {
     super.initState();
     _fetchReviews();
+    GlobalSearchService().queryNotifier.addListener(_onSearchQueryChanged);
+  }
+
+  @override
+  void dispose() {
+    GlobalSearchService().queryNotifier.removeListener(_onSearchQueryChanged);
+    _replyController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchQueryChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchReviews() async {
@@ -60,9 +73,20 @@ class _ReviewsPageState extends State<ReviewsPage> {
     }
   }
 
-  List<Review> get _filtered => _filterStar == 0
-      ? _reviews
-      : _reviews.where((r) => r.rating.round() == _filterStar).toList();
+  List<Review> get _filtered {
+    final rawQuery = GlobalSearchService().queryNotifier.value;
+    final query = GlobalSearchService().removeDiacritics(rawQuery.toLowerCase().trim());
+
+    final filteredByStar = _filterStar == 0
+        ? _reviews
+        : _reviews.where((r) => r.rating.round() == _filterStar).toList();
+        
+    return filteredByStar.where((r) {
+      final name = GlobalSearchService().removeDiacritics(r.customerName.toLowerCase());
+      final comment = GlobalSearchService().removeDiacritics(r.comment.toLowerCase());
+      return query.isEmpty || name.contains(query) || comment.contains(query);
+    }).toList();
+  }
 
   double get _avgRating {
     if (_reviews.isEmpty) return 0;

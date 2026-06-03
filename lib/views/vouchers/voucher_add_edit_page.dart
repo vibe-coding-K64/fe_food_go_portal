@@ -26,6 +26,7 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
   final _valueCtrl = TextEditingController();
   final _pointsCtrl = TextEditingController();
   final _imageCtrl = TextEditingController();
+  final _limitCountCtrl = TextEditingController();
   final _remainingCtrl = TextEditingController();
   final _termsCtrl = TextEditingController();
   final _minOrderCtrl = TextEditingController();
@@ -47,6 +48,7 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
       _discountType = v.type;
       _valueCtrl.text = v.value.toString();
       _imageCtrl.text = v.imageUrl;
+      _limitCountCtrl.text = v.limitCount.toString();
       _remainingCtrl.text = v.remaining.toString();
       _termsCtrl.text = v.terms;
       _minOrderCtrl.text = v.minOrderValue.toString();
@@ -127,13 +129,21 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
                               if (v != null && v.isNotEmpty && double.tryParse(v) == null) return 'Phải là số hợp lệ';
                               return null;
                             }),
-                        _field('Số lượng voucher', _remainingCtrl, Icons.numbers_outlined,
+                        _field('Số lượng phát hành', _limitCountCtrl, Icons.numbers_outlined,
                             required: true,
                             keyboardType: TextInputType.number,
                             validator: (v) {
                               if (v != null && v.isNotEmpty && int.tryParse(v) == null) return 'Phải là số nguyên hợp lệ';
                               return null;
                             }),
+                        if (widget.isEdit)
+                          _field('Số lượng còn lại', _remainingCtrl, Icons.numbers_outlined,
+                              required: true,
+                              keyboardType: TextInputType.number,
+                              validator: (v) {
+                                if (v != null && v.isNotEmpty && int.tryParse(v) == null) return 'Phải là số nguyên hợp lệ';
+                                return null;
+                              }),
                         _field('Đường dẫn ảnh voucher (Tùy chọn)', _imageCtrl, Icons.image_outlined, required: false),
                         _field('Điều khoản sử dụng (Tùy chọn)', _termsCtrl, Icons.gavel_outlined, required: false, maxLines: 3),
                         SwitchListTile(
@@ -400,10 +410,10 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
           value: double.parse(_valueCtrl.text.trim()),
           pointsRequired: 0,
           imageUrl: _imageCtrl.text.trim(),
-          remaining: int.parse(_remainingCtrl.text.trim()),
+          remaining: widget.isEdit ? int.parse(_remainingCtrl.text.trim()) : int.parse(_limitCountCtrl.text.trim()),
           terms: _termsCtrl.text.trim(),
           minOrderValue: double.parse(_minOrderCtrl.text.trim()),
-          limitCount: int.parse(_remainingCtrl.text.trim()),
+          limitCount: int.parse(_limitCountCtrl.text.trim()),
           isFreeship: _isFreeship,
           isActive: _isActive,
           usedCount: widget.isEdit ? VoucherFormPage.selectedVoucherToEdit!.usedCount : 0,

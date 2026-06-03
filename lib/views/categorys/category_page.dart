@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../data/models/category_model.dart';
 import '../../data/services/category_api_service.dart';
 import '../../data/services/auth_service.dart';
+import '../../data/services/global_search_service.dart';
 
 class MenuCategoryPage extends StatefulWidget {
   final Function(String)? onNavigate;
@@ -24,6 +25,17 @@ class _MenuCategoryPageState extends State<MenuCategoryPage> {
   void initState() {
     super.initState();
     _fetchCategories();
+    GlobalSearchService().queryNotifier.addListener(_onSearchQueryChanged);
+  }
+
+  @override
+  void dispose() {
+    GlobalSearchService().queryNotifier.removeListener(_onSearchQueryChanged);
+    super.dispose();
+  }
+
+  void _onSearchQueryChanged() {
+    if (mounted) setState(() {});
   }
 
   void _showNotificationDialog(BuildContext context, String message, bool isSuccess) {
@@ -96,15 +108,28 @@ class _MenuCategoryPageState extends State<MenuCategoryPage> {
   }
 
   List<Category> get _paginatedCategories {
+    final filtered = _getFilteredCategories();
     int start = (_currentPage - 1) * _itemsPerPage;
     int end = start + _itemsPerPage;
-    if (start >= _categories.length) return [];
-    if (end > _categories.length) end = _categories.length;
-    return _categories.sublist(start, end);
+    if (start >= filtered.length) return [];
+    if (end > filtered.length) end = filtered.length;
+    return filtered.sublist(start, end);
+  }
+
+  List<Category> _getFilteredCategories() {
+    final rawQuery = GlobalSearchService().queryNotifier.value;
+    final query = GlobalSearchService().removeDiacritics(rawQuery.toLowerCase().trim());
+    if (query.isEmpty) return _categories;
+
+    return _categories.where((c) {
+      final name = GlobalSearchService().removeDiacritics(c.name.toLowerCase());
+      return name.contains(query);
+    }).toList();
   }
 
   Widget _buildPagination() {
-    int totalPages = (_categories.length / _itemsPerPage).ceil();
+    final filtered = _getFilteredCategories();
+    int totalPages = (filtered.length / _itemsPerPage).ceil();
     if (totalPages <= 1) return const SizedBox.shrink();
     
     return Container(
@@ -176,7 +201,7 @@ class _MenuCategoryPageState extends State<MenuCategoryPage> {
                 Expanded(
                   child: _isLoading
                       ? const Center(child: CircularProgressIndicator())
-                      : _categories.isEmpty
+                      : _getFilteredCategories().isEmpty
                           ? const Center(child: Text('Chưa có danh mục nào.'))
                           : GridView.builder(
                               padding: const EdgeInsets.all(24),

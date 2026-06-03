@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../../data/services/notification_service.dart';
+import '../../data/services/order_api_service.dart';
 
 class Sidebar extends StatefulWidget {
   final Function(String) onNavigate;
@@ -90,42 +92,47 @@ class _SidebarState extends State<Sidebar> {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 children: [
                 // GIAN HÀNG
-                _section('GIAN HÀNG'),
-                _item(Icons.dashboard_outlined, 'Bảng điều khiển', '/dashboard'),
-                _item(Icons.store_outlined, 'Thông tin quán', '/store'),
+                _section('sidebar.store'.tr()),
+                _item(Icons.dashboard_outlined, 'sidebar.dashboard'.tr(), '/dashboard'),
+                _item(Icons.store_outlined, 'sidebar.storeInfo'.tr(), '/store'),
 
                 // THỰC ĐƠN
-                _section('THỰC ĐƠN'),
-                _item(Icons.category_outlined, 'Danh mục món', '/menu-categories'),
-                _item(Icons.fastfood_outlined, 'Món ăn', '/products'),
+                _section('sidebar.menu'.tr()),
+                _item(Icons.category_outlined, 'sidebar.categories'.tr(), '/menu-categories'),
+                _item(Icons.fastfood_outlined, 'sidebar.products'.tr(), '/products'),
 
                 // KINH DOANH
-                _section('KINH DOANH'),
-                _item(Icons.shopping_bag_outlined, 'Đơn hàng', '/orders'),
-                _item(Icons.local_offer_outlined, 'Mã giảm giá', '/vouchers'),
-                _item(Icons.star_outline, 'Đánh giá', '/reviews'),
+                _section('sidebar.business'.tr()),
+                ValueListenableBuilder<int>(
+                  valueListenable: OrderBadgeService().pendingCountNotifier,
+                  builder: (context, count, child) {
+                    return _item(Icons.shopping_bag_outlined, 'sidebar.orders'.tr(), '/orders', badgeCount: count);
+                  },
+                ),
+                _item(Icons.local_offer_outlined, 'sidebar.vouchers'.tr(), '/vouchers'),
+                _item(Icons.star_outline, 'sidebar.reviews'.tr(), '/reviews'),
 
                 // TÀI CHÍNH
-                _section('TÀI CHÍNH'),
-                _item(Icons.account_balance_wallet_outlined, 'Ví doanh thu', '/finance/wallet'),
-                _item(Icons.receipt_long_outlined, 'Lịch sử giao dịch', '/finance/transactions'),
-                _item(Icons.savings_outlined, 'Rút tiền', '/finance/withdrawal'),
+                _section('sidebar.finance'.tr()),
+                _item(Icons.account_balance_wallet_outlined, 'sidebar.wallet'.tr(), '/finance/wallet'),
+                _item(Icons.receipt_long_outlined, 'sidebar.transactions'.tr(), '/finance/transactions'),
+                _item(Icons.savings_outlined, 'sidebar.withdrawal'.tr(), '/finance/withdrawal'),
 
                 // HỖ TRỢ
-                _section('HỖ TRỢ'),
-                _item(Icons.chat_bubble_outline, 'Chat khách hàng', '/chat'),
+                _section('sidebar.support'.tr()),
+                // _item(Icons.chat_bubble_outline, 'sidebar.chat'.tr(), '/chat'),
                 ValueListenableBuilder<int>(
                   valueListenable: NotificationService().unreadCountNotifier,
                   builder: (context, count, child) {
-                    return _item(Icons.notifications_outlined, 'Thông báo', '/notifications', badgeCount: count);
+                    return _item(Icons.notifications_outlined, 'sidebar.notifications'.tr(), '/notifications', badgeCount: count);
                   },
                 ),
-                _item(Icons.report_gmailerrorred_outlined, 'Khiếu nại', '/report-tickets'),
+                // _item(Icons.report_gmailerrorred_outlined, 'sidebar.reports'.tr(), '/report-tickets'),
 
                 // TÀI KHOẢN
-                _section('TÀI KHOẢN'),
-                _item(Icons.person_outline, 'Hồ sơ', '/profile'),
-                _item(Icons.settings_outlined, 'Cài đặt', '/settings'),
+                _section('sidebar.account'.tr()),
+                _item(Icons.person_outline, 'sidebar.profile'.tr(), '/profile'),
+                _item(Icons.settings_outlined, 'sidebar.settings'.tr(), '/settings'),
               ],
             ),
           ),

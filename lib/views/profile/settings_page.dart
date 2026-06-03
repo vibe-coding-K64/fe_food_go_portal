@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:easy_localization/easy_localization.dart';
 import '../../controllers/theme_controller.dart';
+import '../../data/services/auth_service.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -86,9 +88,14 @@ class _SettingsPageState extends State<SettingsPage> {
                               ),
                             ),
                             DropdownButton<String>(
-                              value: _language,
+                              value: context.locale.languageCode == 'en' ? 'English' : 'Tiếng Việt',
                               items: ['Tiếng Việt', 'English'].map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
                               onChanged: (v) {
+                                if (v == 'English') {
+                                  context.setLocale(const Locale('en', ''));
+                                } else {
+                                  context.setLocale(const Locale('vi', ''));
+                                }
                                 setState(() => _language = v!);
                                 _saveSetting('setting_language', v);
                               },
@@ -100,11 +107,6 @@ class _SettingsPageState extends State<SettingsPage> {
                     ]),
                     const SizedBox(height: 16),
                     _buildSection('Thông báo', [
-                      _switchTile('Bật Push Notification', 'Nhận thông báo đẩy trên thiết bị', Icons.notifications_outlined, _pushEnabled, (v) {
-                        setState(() => _pushEnabled = v);
-                        _saveSetting('setting_push', v);
-                      }),
-                      const Divider(height: 1),
                       _switchTile('Đơn hàng', 'Thông báo về tình trạng các đơn hàng', Icons.shopping_bag_outlined, _orderNotif, (v) {
                         setState(() => _orderNotif = v);
                         _saveSetting('setting_order', v);
@@ -128,19 +130,27 @@ class _SettingsPageState extends State<SettingsPage> {
                 child: Column(
                   children: [
                     _buildSection('Tài khoản', [
-                      _actionTile('Đổi mật khẩu', Icons.lock_outline, Colors.blue, () {}),
+                      _actionTile('Đổi mật khẩu', Icons.lock_outline, Colors.blue, () {
+                        _showPasswordChangeDialog(context);
+                      }),
                       const Divider(height: 1),
-                      _actionTile('Quản lý phiên đăng nhập', Icons.devices_outlined, Colors.purple, () {}),
-                      const Divider(height: 1),
-                      _actionTile('Xóa bộ nhớ cache', Icons.cleaning_services_outlined, Colors.orange, () {}),
+                      _actionTile('Quản lý phiên đăng nhập', Icons.devices_outlined, Colors.purple, () {
+                        _showDevSnackbar(context, 'Quản lý phiên đăng nhập');
+                      }),
                     ]),
                     const SizedBox(height: 16),
                     _buildSection('Hỗ trợ', [
-                      _actionTile('Chính sách bảo mật', Icons.privacy_tip_outlined, Colors.grey, () {}),
+                      _actionTile('Chính sách bảo mật', Icons.privacy_tip_outlined, Colors.grey, () {
+                        _showDevSnackbar(context, 'Chính sách bảo mật');
+                      }),
                       const Divider(height: 1),
-                      _actionTile('Điều khoản dịch vụ', Icons.description_outlined, Colors.grey, () {}),
+                      _actionTile('Điều khoản dịch vụ', Icons.description_outlined, Colors.grey, () {
+                        _showDevSnackbar(context, 'Điều khoản dịch vụ');
+                      }),
                       const Divider(height: 1),
-                      _actionTile('Liên hệ hỗ trợ', Icons.headset_mic_outlined, Colors.green, () {}),
+                      _actionTile('Liên hệ hỗ trợ', Icons.headset_mic_outlined, Colors.green, () {
+                        _showDevSnackbar(context, 'Liên hệ hỗ trợ');
+                      }),
                     ]),
                     const SizedBox(height: 16),
                     Container(
@@ -160,7 +170,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           SizedBox(
                             width: double.infinity,
                             child: OutlinedButton.icon(
-                              onPressed: () {},
+                              onPressed: () => _showLogoutDialog(context),
                               icon: const Icon(Icons.logout, color: Colors.red, size: 18),
                               label: const Text('Đăng xuất', style: TextStyle(color: Colors.red)),
                               style: OutlinedButton.styleFrom(
@@ -235,6 +245,196 @@ class _SettingsPageState extends State<SettingsPage> {
             const SizedBox(width: 12),
             Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14))),
             const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDevSnackbar(BuildContext context, String feature) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: const Text('Thông báo'),
+        content: Text('Tính năng "$feature" đang được phát triển!'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white, // Add white background
+        title: const Text('Đăng xuất'),
+        content: const Text('Bạn có chắc chắn muốn đăng xuất khỏi ứng dụng không?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              AuthService().logout();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Đăng xuất', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.check_circle_outline, color: Colors.green, size: 60),
+            ),
+            const SizedBox(height: 24),
+            const Text('Thành công!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, color: Colors.black87)),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Đóng', style: TextStyle(fontSize: 16)),
+              ),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showPasswordChangeDialog(BuildContext context) async {
+    final oldCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool isSaving = false;
+    bool obscurePassword = true;
+    String? oldPasswordError;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (contextDialog, setStateDialog) => AlertDialog(
+          backgroundColor: Colors.white,
+          title: const Center(
+            child: Text('Đổi mật khẩu', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: oldCtrl,
+                  obscureText: obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'Mật khẩu cũ', 
+                    border: const OutlineInputBorder(),
+                    errorText: oldPasswordError,
+                    suffixIcon: IconButton(
+                      icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
+                      onPressed: () => setStateDialog(() => obscurePassword = !obscurePassword),
+                    ),
+                  ),
+                  onChanged: (v) {
+                    if (oldPasswordError != null) setStateDialog(() => oldPasswordError = null);
+                  },
+                  validator: (v) => v!.isEmpty ? 'Vui lòng nhập mật khẩu cũ' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: newCtrl,
+                  obscureText: obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'Mật khẩu mới', 
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
+                      onPressed: () => setStateDialog(() => obscurePassword = !obscurePassword),
+                    ),
+                  ),
+                  validator: (v) => v!.length < 6 ? 'Mật khẩu mới ít nhất 6 ký tự' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: confirmCtrl,
+                  obscureText: obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'Xác nhận mật khẩu mới', 
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility, color: Colors.grey),
+                      onPressed: () => setStateDialog(() => obscurePassword = !obscurePassword),
+                    ),
+                  ),
+                  validator: (v) => v != newCtrl.text ? 'Mật khẩu xác nhận không khớp' : null,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSaving ? null : () => Navigator.pop(ctx),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: isSaving
+                  ? null
+                  : () async {
+                      if (formKey.currentState!.validate()) {
+                        setStateDialog(() => isSaving = true);
+                        try {
+                          await AuthService().changePassword(oldCtrl.text, newCtrl.text);
+                          if (mounted) {
+                            Navigator.pop(ctx);
+                            _showSuccessDialog(context, 'Đổi mật khẩu thành công');
+                          }
+                        } catch (e) {
+                          setStateDialog(() {
+                            isSaving = false;
+                            oldPasswordError = e.toString().replaceAll('Exception: ', '');
+                          });
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B35), foregroundColor: Colors.white),
+              child: isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Lưu'),
+            ),
           ],
         ),
       ),

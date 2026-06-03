@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../data/services/global_search_service.dart';
 import '../../data/models/transaction_model.dart';
 import '../../data/services/wallet_api_service.dart';
 
@@ -22,7 +23,18 @@ class _TransactionPageState extends State<TransactionPage> {
   @override
   void initState() {
     super.initState();
+    GlobalSearchService().queryNotifier.addListener(_onSearchQueryChanged);
     _fetchTransactions();
+  }
+
+  @override
+  void dispose() {
+    GlobalSearchService().queryNotifier.removeListener(_onSearchQueryChanged);
+    super.dispose();
+  }
+
+  void _onSearchQueryChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _fetchTransactions() async {
@@ -41,9 +53,17 @@ class _TransactionPageState extends State<TransactionPage> {
   }
 
   List<Transaction> get _filtered {
-    if (_filter == 'Tiền vào') return _transactions.where((t) => t.type == 1 || t.type == 2 || t.type == 4).toList();
-    if (_filter == 'Tiền ra') return _transactions.where((t) => t.type == 3).toList();
-    return _transactions;
+    final rawQuery = GlobalSearchService().queryNotifier.value;
+    final query = GlobalSearchService().removeDiacritics(rawQuery.toLowerCase().trim());
+    
+    List<Transaction> filtered = _transactions;
+    if (_filter == 'Tiền vào') filtered = filtered.where((t) => t.type == 1 || t.type == 2 || t.type == 4).toList();
+    if (_filter == 'Tiền ra') filtered = filtered.where((t) => t.type == 3).toList();
+    
+    return filtered.where((t) {
+      final desc = GlobalSearchService().removeDiacritics(t.description.toLowerCase());
+      return query.isEmpty || desc.contains(query);
+    }).toList();
   }
 
   @override
@@ -58,16 +78,38 @@ class _TransactionPageState extends State<TransactionPage> {
         Row(
           children: _filters.map((f) {
             final isSelected = _filter == f;
+            Color filterColor;
+            if (f == 'Tất cả') {
+              filterColor = const Color(0xFFFF6B35);
+            } else if (f == 'Tiền vào') {
+              filterColor = Colors.green;
+            } else {
+              filterColor = const Color(0xFFDC3545); // Đỏ cho tiền ra
+            }
+
             return Padding(
               padding: const EdgeInsets.only(right: 8),
               child: ChoiceChip(
+                showCheckmark: false,
                 label: Text(f),
                 selected: isSelected,
                 onSelected: (_) => setState(() => _filter = f),
-                selectedColor: const Color(0xFFFF6B35),
-                labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.grey.shade700, fontWeight: FontWeight.w500),
-                backgroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: isSelected ? const Color(0xFFFF6B35) : Colors.grey.shade300)),
+                selectedColor: filterColor,
+                labelStyle: TextStyle(
+                  color: isSelected ? Colors.white : filterColor, 
+                  fontWeight: FontWeight.bold,
+                ),
+                backgroundColor: filterColor.withOpacity(0.1),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  side: BorderSide(
+                    color: isSelected ? Colors.transparent : filterColor,
+                    width: 1.0,
+                  ),
+                ),
+                elevation: 0,
+                pressElevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
             );
           }).toList(),

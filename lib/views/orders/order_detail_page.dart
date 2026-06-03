@@ -325,14 +325,20 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFF3F4F6),
+          color: order.paymentStatus == 2 ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Icon(Icons.payment, size: 16, color: Colors.grey),
-            const SizedBox(width: 8),
-            Text('Thanh toán: ${order.paymentMethod}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+            Row(
+              children: [
+                Icon(Icons.payment, size: 16, color: order.paymentStatus == 2 ? Colors.green : Colors.orange),
+                const SizedBox(width: 8),
+                Text(order.paymentMethod, style: TextStyle(color: order.paymentStatus == 2 ? Colors.green : Colors.orange, fontSize: 13, fontWeight: FontWeight.w500)),
+              ],
+            ),
+            Text(order.paymentStatus == 2 ? 'Đã thanh toán' : 'Chưa thanh toán', style: TextStyle(color: order.paymentStatus == 2 ? Colors.green : Colors.orange, fontSize: 13, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
