@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../../data/models/store_model.dart';
 import '../../data/services/store_api_service.dart';
 import '../../data/services/auth_service.dart';
@@ -31,6 +33,10 @@ class _StoreFormPageState extends State<StoreFormPage> {
   Store? _store;
   final AuthService _authService = AuthService();
   String? _currentStoreId;
+  
+  double? _lat;
+  double? _lng;
+  final MapController _mapController = MapController();
 
   @override
   void initState() {
@@ -57,6 +63,8 @@ class _StoreFormPageState extends State<StoreFormPage> {
         _avtUrlCtrl.text = store.avtUrl;
         _deliveryTimeCtrl.text = store.deliveryTime;
         _deliveryFeeCtrl.text = store.deliveryFee.toString();
+        _lat = store.lat;
+        _lng = store.lng;
       }  _isLoading = false;
       });
     } catch (e) {
@@ -161,6 +169,56 @@ class _StoreFormPageState extends State<StoreFormPage> {
                     }
                     return null;
                   }),
+                ]),
+                const SizedBox(height: 24),
+                _buildSection('Vị trí bản đồ', [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: SizedBox(
+                      height: 300,
+                      child: FlutterMap(
+                        mapController: _mapController,
+                        options: MapOptions(
+                          initialCenter: _lat != null && _lng != null
+                              ? LatLng(_lat!, _lng!)
+                              : const LatLng(10.8455, 106.7939), // Default to a central location (e.g. HCM)
+                          initialZoom: 15.0,
+                          onTap: (tapPosition, point) {
+                            setState(() {
+                              _lat = point.latitude;
+                              _lng = point.longitude;
+                            });
+                          },
+                        ),
+                        children: [
+                          TileLayer(
+                            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                            userAgentPackageName: 'com.example.fe_food_go_portal',
+                          ),
+                          MarkerLayer(
+                            markers: [
+                              if (_lat != null && _lng != null)
+                                Marker(
+                                  point: LatLng(_lat!, _lng!),
+                                  width: 40,
+                                  height: 40,
+                                  child: const Icon(
+                                    Icons.location_on,
+                                    color: Colors.red,
+                                    size: 40,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_lat != null && _lng != null)
+                    Text('Tọa độ đã chọn: $_lat, $_lng', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w500))
+                  else
+                    const Text('Vui lòng chạm vào bản đồ để chọn vị trí gian hàng của bạn', style: TextStyle(color: Color(0xFFDC3545), fontWeight: FontWeight.w500)),
                 ]),
                 const SizedBox(height: 24),
                 Row(
@@ -274,8 +332,8 @@ class _StoreFormPageState extends State<StoreFormPage> {
           deliveryFee: _deliveryFeeCtrl.text.trim().isNotEmpty ? (double.tryParse(_deliveryFeeCtrl.text.trim()) ?? (_store?.deliveryFee ?? 15000.0)) : (_store?.deliveryFee ?? 15000.0),
           categoryIds: _store?.categoryIds ?? [],
           restaurantCategories: _store?.restaurantCategories,
-          lat: _store?.lat,
-          lng: _store?.lng,
+          lat: _lat,
+          lng: _lng,
           createdAt: _store?.createdAt,
           updatedAt: _store?.updatedAt,
         );
