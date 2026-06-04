@@ -148,6 +148,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   IconData _typeIcon(String type) {
     switch (type) {
+      case '11':
+      case '21': return Icons.add_shopping_cart;
       case '1': return Icons.shopping_bag_outlined;
       case '2': return Icons.account_balance_wallet_outlined;
       case '3': return Icons.star_outline;
@@ -158,6 +160,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   Color _typeColor(String type) {
     switch (type) {
+      case '11':
+      case '21': return const Color(0xFFFF8C42);
       case '1': return const Color(0xFFFF6B35);
       case '2': return Colors.green;
       case '3': return Colors.amber;

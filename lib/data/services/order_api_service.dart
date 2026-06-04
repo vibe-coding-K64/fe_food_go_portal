@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'auth_service.dart';
 import '../models/order_model.dart';
 import 'api_constants.dart';
+import 'notification_service.dart';
 
 class OrderApiService {
   final Dio _dio = Dio(BaseOptions(
@@ -72,22 +73,30 @@ class OrderBadgeService {
   Timer? _pollingTimer;
   final OrderApiService _apiService = OrderApiService();
 
+  // Theo dõi đơn hàng đã biết để phát hiện đơn mới / hủy
+  Set<String> _knownPendingOrderIds = {};
+  bool _isFirstFetch = true;
+
   OrderBadgeService._internal() {
     AuthService.authStateNotifier.addListener(_onAuthStateChanged);
-    _startPolling();
+    startPolling();
   }
 
   void _onAuthStateChanged() {
     if (AuthService.authStateNotifier.value) {
+      _isFirstFetch = true;
+      _knownPendingOrderIds = {};
       fetchPendingCount();
     } else {
+      _isFirstFetch = true;
+      _knownPendingOrderIds = {};
       pendingCountNotifier.value = 0;
     }
   }
 
-  void _startPolling() {
-    fetchPendingCount();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+  void startPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (AuthService.authStateNotifier.value) {
         fetchPendingCount();
       }
@@ -104,9 +113,57 @@ class OrderBadgeService {
       final storeId = await AuthService().getStoreId();
       if (storeId != null) {
         final orders = await _apiService.getOrdersByStoreId(storeId);
-        // Trạng thái 0 là chờ xác nhận - dùng statusValue vì status là String
-        final count = orders.where((o) => o.statusValue == 0).length;
+        final pendingOrders = orders.where((o) => o.statusValue == 0).toList();
+        final cancelledOrders = orders.where((o) => o.statusValue == 4).toList();
+        final count = pendingOrders.length;
         pendingCountNotifier.value = count;
+
+        final currentPendingIds = pendingOrders.map((o) => o.id).whereType<String>().toSet();
+        final currentCancelledIds = cancelledOrders.map((o) => o.id).whereType<String>().toSet();
+
+        if (!_isFirstFetch) {
+          // Phát hiện đơn hàng mới (pending mới xuất hiện)
+          final newOrderIds = currentPendingIds.difference(_knownPendingOrderIds);
+          for (final newId in newOrderIds) {
+            final order = pendingOrders.firstWhere((o) => o.id == newId);
+            final receiverName = order.receiverName ?? 'Khách hàng';
+            final code = order.code ?? newId.substring(newId.length > 6 ? newId.length - 6 : 0).toUpperCase();
+            final amount = order.finalAmount ?? order.totalAmount ?? 0;
+
+            // Tạo thông báo đơn hàng mới trên chuông
+            NotificationService().addLocalNotification({
+              'id': 'new_order_$newId',
+              'type': 21,
+              'title': '🛒 Đơn hàng mới từ $receiverName',
+              'body': '#$code · ${amount > 0 ? "${amount.toStringAsFixed(0)}đ" : ""} · Chờ xác nhận',
+              'orderId': newId,
+              'isRead': false,
+              'createdAt': DateTime.now().toIso8601String(),
+            });
+          }
+
+          // Phát hiện đơn hàng bị hủy (từ pending biến mất và xuất hiện ở cancelled)
+          final disappearedIds = _knownPendingOrderIds.difference(currentPendingIds);
+          for (final goneId in disappearedIds) {
+            if (currentCancelledIds.contains(goneId)) {
+              final order = cancelledOrders.firstWhere((o) => o.id == goneId);
+              final code = order.code ?? goneId.substring(goneId.length > 6 ? goneId.length - 6 : 0).toUpperCase();
+              
+              NotificationService().addLocalNotification({
+                'id': 'cancel_order_$goneId',
+                'type': 4,
+                'title': 'Đơn hàng #$code đã bị hủy',
+                'body': 'Khách hàng đã hủy đơn hàng này.',
+                'orderId': goneId,
+                'isRead': false,
+                'createdAt': DateTime.now().toIso8601String(),
+              });
+            }
+          }
+        }
+
+        _knownPendingOrderIds = currentPendingIds;
+        _isFirstFetch = false;
       }
     } catch (e) {
       // ignore

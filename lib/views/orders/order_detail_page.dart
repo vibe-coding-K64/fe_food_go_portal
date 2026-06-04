@@ -179,7 +179,16 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                 color: const Color(0xFFFFF3E0),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.fastfood, color: Color(0xFFFF6B35), size: 20),
+              child: item.imageUrl != null && item.imageUrl!.isNotEmpty 
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      item.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.fastfood, color: Color(0xFFFF6B35), size: 20),
+                    ),
+                  )
+                : const Icon(Icons.fastfood, color: Color(0xFFFF6B35), size: 20),
             ),
             const SizedBox(width: 12),
             Expanded(
