@@ -23,6 +23,7 @@ class NotificationService {
   Timer? _pollingTimer;
   List<String> _knownNotificationIds = [];
   bool _isFirstFetch = true;
+  final List<Map<String, dynamic>> _localNotifications = [];
 
   NotificationService._internal() {
     _dio.interceptors.add(InterceptorsWrapper(
@@ -57,7 +58,7 @@ class NotificationService {
 
   void _startPolling() {
     fetchNotifications();
-    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (AuthService.authStateNotifier.value) {
         fetchNotifications();
       }
@@ -82,11 +83,41 @@ class NotificationService {
         final bool showReview = prefs.getBool('setting_review') ?? true;
         final bool showPayment = prefs.getBool('setting_payment') ?? true;
 
-        // Hiển thị tất cả thông báo (cả chưa đọc và đã đọc)
-        notificationsNotifier.value = parsedList;
+        // Lọc thông báo dựa trên cài đặt
+        final filteredList = parsedList.where((n) {
+          final type = n['type']?.toString();
+          if (type == '1' || type == '4' || type == '11' || type == '12' || type == '13' || type == '21') return showOrder;
+          if (type == '2') return showPayment;
+          if (type == '3') return showReview;
+          return true;
+        }).toList();
+
+        // Chỉ đếm số lượng chưa đọc đối với các loại được bật trong cài đặt
+        int unread = filteredList.where((n) {
+          if (n['isRead'] == true || n['isRead'] == null) return false;
+          return true;
+        }).length;
+        
+        // Merge local notifications vào danh sách API
+        final apiIds = filteredList.map((e) => e['id']?.toString()).toSet();
+        final mergedList = List<Map<String, dynamic>>.from(filteredList);
+        for (var local in _localNotifications) {
+          if (!apiIds.contains(local['id']?.toString())) {
+            mergedList.insert(0, local);
+          }
+        }
+
+        // Đếm unread bao gồm cả local
+        int totalUnread = mergedList.where((n) {
+          if (n['isRead'] == true || n['isRead'] == null) return false;
+          return true;
+        }).length;
+
+        unreadCountNotifier.value = totalUnread;
+        notificationsNotifier.value = mergedList;
 
         if (!_isFirstFetch) {
-          final newIds = parsedList.map((e) => e['id'].toString()).toList();
+          final newIds = filteredList.map((e) => e['id'].toString()).toList();
           final arrivingIds = newIds.where((id) => !_knownNotificationIds.contains(id)).toList();
           if (arrivingIds.isNotEmpty) {
             final newNotifs = parsedList.where((e) => arrivingIds.contains(e['id'].toString())).toList();
@@ -99,17 +130,6 @@ class NotificationService {
           _knownNotificationIds = parsedList.map((e) => e['id'].toString()).toList();
           _isFirstFetch = false;
         }
-        
-        // Chỉ đếm số lượng chưa đọc đối với các loại được bật trong cài đặt
-        unreadCountNotifier.value = parsedList.where((n) {
-          if (n['isRead'] == true) return false;
-          
-          final type = n['type']?.toString();
-          if (type == '1' || type == '4') return showOrder;
-          if (type == '2') return showPayment;
-          if (type == '3') return showReview;
-          return true;
-        }).length;
       }
     } catch (e) {
       debugPrint('Lỗi khi fetch thông báo: $e');
@@ -123,21 +143,27 @@ class NotificationService {
     if (index != -1) {
       final newList = List<Map<String, dynamic>>.from(currentList);
       newList[index] = {...newList[index], 'isRead': true};
-      notificationsNotifier.value = newList;
-      
       final prefs = await SharedPreferences.getInstance();
       final bool showOrder = prefs.getBool('setting_order') ?? true;
       final bool showReview = prefs.getBool('setting_review') ?? true;
       final bool showPayment = prefs.getBool('setting_payment') ?? true;
       
       unreadCountNotifier.value = newList.where((n) {
-        if (n['isRead'] == true) return false;
+        if (n['isRead'] == true || n['isRead'] == null) return false;
         final type = n['type']?.toString();
-        if (type == '1' || type == '4') return showOrder;
+        if (type == '1' || type == '4' || type == '11' || type == '12' || type == '13' || type == '21') return showOrder;
         if (type == '2') return showPayment;
         if (type == '3') return showReview;
         return true;
       }).length;
+      
+      notificationsNotifier.value = newList;
+    }
+
+    // Update local list
+    final localIndex = _localNotifications.indexWhere((n) => n['id'] == id);
+    if (localIndex != -1) {
+      _localNotifications[localIndex]['isRead'] = true;
     }
 
     try {
@@ -154,6 +180,11 @@ class NotificationService {
     // Optimistic UI update
     notificationsNotifier.value = [];
     unreadCountNotifier.value = 0;
+
+    // Update local list
+    for (var n in _localNotifications) {
+      n['isRead'] = true;
+    }
 
     try {
       final response = await _dio.put('/merchants/notifications/read-all');
@@ -184,21 +215,61 @@ class NotificationService {
     final title = notif['title']?.toString() ?? 'Thông báo mới';
     final body = notif['body']?.toString() ?? '';
 
-    late OverlayEntry entry;
-    entry = OverlayEntry(
-      builder: (ctx) => _TopNotificationToast(
-        title: title,
-        body: body,
-        onDismiss: () {
-          try { entry.remove(); } catch (_) {}
-        },
-      ),
-    );
+    try {
+      late OverlayEntry entry;
+      entry = OverlayEntry(
+        builder: (ctx) => _TopNotificationToast(
+          title: title,
+          body: body,
+          onDismiss: () {
+            try { entry.remove(); } catch (_) {}
+          },
+        ),
+      );
 
-    Overlay.of(context).insert(entry);
-    Future.delayed(const Duration(seconds: 6), () {
-      try { entry.remove(); } catch (_) {}
-    });
+      final overlay = MyApp.navigatorKey.currentState?.overlay;
+      if (overlay != null) {
+        overlay.insert(entry);
+        Future.delayed(const Duration(seconds: 6), () {
+          try { entry.remove(); } catch (_) {}
+        });
+      } else {
+        throw Exception("No overlay");
+      }
+    } catch (_) {
+      // Overlay chưa sẵn sàng, fallback sang SnackBar
+      final messenger = MyApp.scaffoldMessengerKey.currentState;
+      if (messenger != null) {
+        messenger.showSnackBar(SnackBar(
+          content: Text('$title${body.isNotEmpty ? '\n$body' : ''}'),
+          backgroundColor: const Color(0xFFFF6B35),
+          duration: const Duration(seconds: 5),
+        ));
+      }
+    }
+  }
+  void addLocalNotification(Map<String, dynamic> notif) {
+    // Kiểm tra trùng ID trong local
+    if (_localNotifications.any((n) => n['id'] == notif['id'])) return;
+    
+    // Kiểm tra trùng ID trong list hiện tại
+    final currentList = List<Map<String, dynamic>>.from(notificationsNotifier.value);
+    if (currentList.any((n) => n['id'] == notif['id'])) return;
+    
+    // Lưu vào local list (tồn tại qua các lần fetchNotifications)
+    _localNotifications.add(notif);
+    
+    // Thêm vào đầu danh sách hiển thị
+    currentList.insert(0, notif);
+    notificationsNotifier.value = currentList;
+    
+    // Cập nhật số chưa đọc
+    if (notif['isRead'] != true) {
+      unreadCountNotifier.value = unreadCountNotifier.value + 1;
+    }
+    
+    // Hiển thị toast popup
+    _showNotificationSnackbar(notif);
   }
 }
 
