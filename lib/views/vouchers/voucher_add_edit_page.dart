@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/models/voucher_model.dart';
 import '../../data/services/voucher_api_service.dart';
 import '../../data/services/auth_service.dart';
+import '../widgets/image_upload_field.dart';
 
 /// Form dùng chung thêm/sửa voucher
 class VoucherFormPage extends StatefulWidget {
@@ -144,7 +145,12 @@ class _VoucherFormPageState extends State<VoucherFormPage> {
                                 if (v != null && v.isNotEmpty && int.tryParse(v) == null) return 'Phải là số nguyên hợp lệ';
                                 return null;
                               }),
-                        _field('Đường dẫn ảnh voucher (Tùy chọn)', _imageCtrl, Icons.image_outlined, required: false),
+                        ImageUploadField(
+                          label: 'Ảnh voucher (Tùy chọn)',
+                          controller: _imageCtrl,
+                          folderPath: 'vouchers',
+                          required: false,
+                        ),
                         _field('Điều khoản sử dụng (Tùy chọn)', _termsCtrl, Icons.gavel_outlined, required: false, maxLines: 3),
                         SwitchListTile(
                           title: const Text('Freeship'),

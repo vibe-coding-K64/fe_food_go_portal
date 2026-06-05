@@ -4,7 +4,9 @@ import 'package:latlong2/latlong.dart';
 import '../../data/models/store_model.dart';
 import '../../data/services/store_api_service.dart';
 import '../../data/services/auth_service.dart';
-
+import 'package:dio/dio.dart';
+import 'package:geolocator/geolocator.dart';
+import '../widgets/image_upload_field.dart';
 /// Form dùng chung cho thêm/sửa thông tin quán
 class StoreFormPage extends StatefulWidget {
   final bool isEdit;
@@ -45,6 +47,39 @@ class _StoreFormPageState extends State<StoreFormPage> {
       _loadStoreData();
     } else {
       _isLoading = false;
+      _getCurrentLocation();
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Dịch vụ vị trí bị tắt. Vui lòng bật GPS.')));
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quyền truy cập vị trí bị từ chối.')));
+          return;
+        }
+      }
+
+      Position position = await Geolocator.getCurrentPosition();
+      if (mounted) {
+        setState(() {
+          _lat = position.latitude;
+          _lng = position.longitude;
+        });
+        _mapController.move(LatLng(_lat!, _lng!), 15.0);
+        _getAddressFromLatLng(_lat!, _lng!);
+      }
+    } catch (e) {
+      debugPrint('Lỗi lấy vị trí: $e');
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Không thể lấy vị trí hiện tại: $e')));
     }
   }
 
@@ -128,6 +163,31 @@ class _StoreFormPageState extends State<StoreFormPage> {
     );
   }
 
+  Future<void> _getAddressFromLatLng(double lat, double lng) async {
+    try {
+      final dio = Dio();
+      final response = await dio.get('https://nominatim.openstreetmap.org/reverse', queryParameters: {
+        'format': 'json',
+        'lat': lat,
+        'lon': lng,
+        'zoom': 18,
+        'addressdetails': 1,
+      });
+      if (response.statusCode == 200) {
+        final data = response.data;
+        if (data != null && data['display_name'] != null) {
+          if (mounted) {
+            setState(() {
+              _addressCtrl.text = data['display_name'];
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Lỗi lấy địa chỉ: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -156,12 +216,32 @@ class _StoreFormPageState extends State<StoreFormPage> {
                 _buildSection('Thông tin cơ bản', [
                   _field('Tên quán', _nameCtrl, Icons.store_outlined, required: true),
                   _field('Địa chỉ', _addressCtrl, Icons.location_on_outlined, required: true),
-                  _field('Link Ảnh bìa (Backdrop)', _coverUrlCtrl, Icons.image_outlined, required: true),
-                  _field('Link Logo (Avatar)', _avtUrlCtrl, Icons.link, required: true, validator: (v) {
-                    if (v == null || v.isEmpty) return 'Vui lòng nhập link logo';
-                    if (!Uri.tryParse(v)!.hasAbsolutePath) return 'Link không hợp lệ';
-                    return null;
-                  }),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: ImageUploadField(
+                          label: 'Ảnh bìa (Backdrop)',
+                          controller: _coverUrlCtrl,
+                          folderPath: 'store_covers',
+                          required: true,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ImageUploadField(
+                          label: 'Logo (Avatar)',
+                          controller: _avtUrlCtrl,
+                          folderPath: 'store_avatars',
+                          required: true,
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Vui lòng tải lên logo';
+                            return null;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                   _field('Thời gian giao hàng (VD: 20-30 phút)', _deliveryTimeCtrl, Icons.timer_outlined),
                   _field('Phí giao hàng (VNĐ)', _deliveryFeeCtrl, Icons.attach_money_outlined, validator: (v) {
                     if (v != null && v.trim().isNotEmpty && double.tryParse(v.trim()) == null) {
@@ -175,19 +255,20 @@ class _StoreFormPageState extends State<StoreFormPage> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: SizedBox(
-                      height: 300,
+                      height: 450,
                       child: FlutterMap(
                         mapController: _mapController,
                         options: MapOptions(
-                          initialCenter: _lat != null && _lng != null
+                          initialCenter: (_lat != null && _lng != null && (_lat != 0 || _lng != 0))
                               ? LatLng(_lat!, _lng!)
-                              : const LatLng(10.8455, 106.7939), // Default to a central location (e.g. HCM)
+                              : const LatLng(10.8455, 106.7939), // Default to HCM if null or 0,0
                           initialZoom: 15.0,
                           onTap: (tapPosition, point) {
                             setState(() {
                               _lat = point.latitude;
                               _lng = point.longitude;
                             });
+                            _getAddressFromLatLng(point.latitude, point.longitude);
                           },
                         ),
                         children: [
@@ -215,10 +296,22 @@ class _StoreFormPageState extends State<StoreFormPage> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  if (_lat != null && _lng != null)
-                    Text('Tọa độ đã chọn: $_lat, $_lng', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w500))
-                  else
-                    const Text('Vui lòng chạm vào bản đồ để chọn vị trí gian hàng của bạn', style: TextStyle(color: Color(0xFFDC3545), fontWeight: FontWeight.w500)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: (_lat != null && _lng != null && (_lat != 0 || _lng != 0))
+                            ? Text('Tọa độ đã chọn: $_lat, $_lng', style: const TextStyle(color: Colors.green, fontWeight: FontWeight.w500))
+                            : const Text('Vui lòng chạm vào bản đồ để chọn vị trí', style: TextStyle(color: Color(0xFFDC3545), fontWeight: FontWeight.w500)),
+                      ),
+                      TextButton.icon(
+                        onPressed: _getCurrentLocation,
+                        icon: const Icon(Icons.my_location, size: 18),
+                        label: const Text('Vị trí hiện tại'),
+                        style: TextButton.styleFrom(foregroundColor: const Color(0xFFFF6B35)),
+                      ),
+                    ],
+                  ),
                 ]),
                 const SizedBox(height: 24),
                 Row(

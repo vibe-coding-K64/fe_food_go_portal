@@ -80,7 +80,7 @@ class _WalletPageState extends State<WalletPage> {
               children: [
                 const Text('Tổng số dư khả dụng', style: TextStyle(color: Colors.white70, fontSize: 14)),
                 const SizedBox(height: 8),
-                Text(_currencyFormat.format(balance), style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold)),
+                Text(_currencyFormat.format(balance - pendingBalance), style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 20),
                 Row(
                   children: [

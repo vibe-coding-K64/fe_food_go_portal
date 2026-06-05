@@ -3,6 +3,7 @@ import '../../data/models/category_model.dart';
 import '../../data/services/category_api_service.dart';
 import '../../data/services/auth_service.dart';
 import '../../data/services/global_search_service.dart';
+import '../widgets/image_upload_field.dart';
 
 class MenuCategoryPage extends StatefulWidget {
   final Function(String)? onNavigate;
@@ -19,7 +20,7 @@ class _MenuCategoryPageState extends State<MenuCategoryPage> {
   
   // Pagination
   int _currentPage = 1;
-  final int _itemsPerPage = 6;
+  final int _itemsPerPage = 10;
 
   @override
   void initState() {
@@ -91,6 +92,14 @@ class _MenuCategoryPageState extends State<MenuCategoryPage> {
       final storeId = await _authService.getStoreId();
       if (storeId == null) throw 'Không tìm thấy storeId';
       final categories = await _apiService.getAllCategories(storeId);
+      categories.sort((a, b) {
+        int orderCmp = a.order.compareTo(b.order);
+        if (orderCmp != 0) return orderCmp;
+        if (a.createdAt != null && b.createdAt != null) {
+          return a.createdAt!.compareTo(b.createdAt!);
+        }
+        return 0;
+      });
       setState(() {
         _categories = categories;
         // Clamp current page
@@ -133,7 +142,7 @@ class _MenuCategoryPageState extends State<MenuCategoryPage> {
     if (totalPages <= 1) return const SizedBox.shrink();
     
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.only(top: 5, bottom: 5),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
@@ -209,7 +218,7 @@ class _MenuCategoryPageState extends State<MenuCategoryPage> {
                                 maxCrossAxisExtent: 250,
                                 crossAxisSpacing: 20,
                                 mainAxisSpacing: 20,
-                                childAspectRatio: 1.1,
+                                childAspectRatio: 0.95,
                               ),
                               itemCount: _paginatedCategories.length,
                               itemBuilder: (context, idx) {
@@ -243,7 +252,7 @@ class _MenuCategoryPageState extends State<MenuCategoryPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                flex: 3,
+                flex: 7,
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.orangeAccent.withOpacity(0.1),
@@ -256,7 +265,7 @@ class _MenuCategoryPageState extends State<MenuCategoryPage> {
                 ),
               ),
               Expanded(
-                flex: 2,
+                flex: 3,
                 child: Container(
                   decoration: const BoxDecoration(
                     color: Color(0xFFF8F9FA),
@@ -283,59 +292,87 @@ class _MenuCategoryPageState extends State<MenuCategoryPage> {
               ),
             ],
           ),
-          Positioned(
-            top: 8,
-            right: 8,
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    iconSize: 16,
-                    padding: EdgeInsets.zero,
-                    onPressed: () => _showCategoryDialog(context, category: cat),
-                    icon: const Icon(Icons.edit_outlined, color: Color(0xFFFF6B35)),
-                    tooltip: 'Sửa',
-                  ),
+          Builder(
+            builder: (context) {
+              bool isSys = cat.storeId == null || cat.storeId!.isEmpty || cat.storeId == 'system' || cat.storeId == 'null';
+              return Positioned(
+                top: 8,
+                right: 8,
+                child: isSys ? const SizedBox.shrink() : Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        iconSize: 16,
+                        padding: EdgeInsets.zero,
+                        onPressed: () => _showCategoryDialog(context, category: cat),
+                        icon: const Icon(Icons.edit_outlined, color: Color(0xFFFF6B35)),
+                        tooltip: 'Sửa',
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        iconSize: 16,
+                        padding: EdgeInsets.zero,
+                        onPressed: () => _confirmDelete(context, cat),
+                        icon: const Icon(Icons.delete_outline, color: Colors.red),
+                        tooltip: 'Xóa',
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 4),
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    iconSize: 16,
-                    padding: EdgeInsets.zero,
-                    onPressed: () => _confirmDelete(context, cat),
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
-                    tooltip: 'Xóa',
-                  ),
-                ),
-              ],
-            ),
+              );
+            }
           ),
-          Positioned(
-            top: 8,
-            left: 8,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF6B35),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '#${index + 1}',
-                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-              ),
-            ),
+          Builder(
+            builder: (context) {
+              bool isSys = cat.storeId == null || cat.storeId!.isEmpty || cat.storeId == 'system' || cat.storeId == 'null';
+              return Positioned(
+                top: 8,
+                left: 8,
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF6B35),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '#${index + 1}',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    if (isSys) ...[
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.blueAccent,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          'Hệ thống',
+                          style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }
           ),
         ],
       ),
@@ -346,11 +383,13 @@ class _MenuCategoryPageState extends State<MenuCategoryPage> {
     final formKey = GlobalKey<FormState>();
     String name = category?.name ?? '';
     int order = category?.order ?? 0;
-    String icon = category?.icon ?? '';
-    String imageUrl = category?.imageUrl ?? '';
+    
+    // Tạo controller riêng cho ImageUploadField trong dialog
+    final imageUrlCtrl = TextEditingController(text: category?.imageUrl ?? '');
 
     // Dùng biến để theo dõi trạng thái loading bên trong Dialog
     bool isSaving = false;
+    String? errorMessage;
 
     showDialog(
       context: context,
@@ -410,40 +449,35 @@ class _MenuCategoryPageState extends State<MenuCategoryPage> {
                         onSaved: (v) => order = int.tryParse(v ?? '0') ?? 0,
                       ),
                       const SizedBox(height: 16),
-                      TextFormField(
-                        initialValue: icon,
-                        decoration: InputDecoration(
-                          labelText: 'Mã Icon (*)',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFFFF6B35)),
+                      ImageUploadField(
+                        label: 'Ảnh đại diện danh mục',
+                        controller: imageUrlCtrl,
+                        folderPath: 'category_images',
+                        required: true,
+                      ),
+                      if (errorMessage != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  errorMessage!,
+                                  style: const TextStyle(color: Colors.red, fontSize: 13),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Mã Icon không được để trống';
-                          return null;
-                        },
-                        onSaved: (v) => icon = v!.trim(),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        initialValue: imageUrl,
-                        decoration: InputDecoration(
-                          labelText: 'Link ảnh đại diện (URL) (*)',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFFFF6B35)),
-                          ),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Link ảnh không được để trống';
-                          if (!v.startsWith('http://') && !v.startsWith('https://')) return 'Phải bắt đầu bằng http:// hoặc https://';
-                          return null;
-                        },
-                        onSaved: (v) => imageUrl = v!.trim(),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -463,8 +497,8 @@ class _MenuCategoryPageState extends State<MenuCategoryPage> {
                       storeId: storeId,
                       name: name,
                       order: order,
-                      icon: icon,
-                      imageUrl: imageUrl,
+                      icon: '', // Remove icon logic
+                      imageUrl: imageUrlCtrl.text.trim(),
                     );
 
                     setDialogState(() => isSaving = true);
@@ -485,10 +519,10 @@ class _MenuCategoryPageState extends State<MenuCategoryPage> {
                       }
                       _fetchCategories();
                     } catch (e) {
-                      setDialogState(() => isSaving = false);
-                      if (mounted) {
-                        _showNotificationDialog(context, e.toString(), false);
-                      }
+                      setDialogState(() {
+                        isSaving = false;
+                        errorMessage = e.toString().replaceAll('Exception: ', '');
+                      });
                     }
                   }
                 },

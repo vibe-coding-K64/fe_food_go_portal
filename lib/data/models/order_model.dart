@@ -158,12 +158,20 @@ class Order {
   }
 
   static String _parsePaymentMethod(dynamic value) {
-    if (value == null) return 'Tiền mặt';
-    String str = value.toString();
-    if (str == '1') return 'Ví MoMo';
-    if (str == '2') return 'Tiền mặt';
-    if (str == '3') return 'ZaloPay';
-    if (str == '4') return 'Thẻ ngân hàng';
+    if (value == null) return 'Thanh toán tiền mặt';
+    String str = value.toString().trim();
+    // Map theo số (chuẩn mới)
+    if (str == '1' || str.toLowerCase() == 'momo') return 'Thanh toán MoMo';
+    if (str == '2' || str.toLowerCase() == 'cash') return 'Thanh toán tiền mặt';
+    if (str == '3' || str.toLowerCase() == 'zalo') return 'Thanh toán ZaloPay';
+    if (str == '4' || str.toLowerCase() == 'card') return 'Thanh toán thẻ';
+    // Map theo tên cũ đang lưu trong Firebase
+    if (str.toLowerCase().contains('momo')) return 'Thanh toán MoMo';
+    if (str.toLowerCase().contains('zalo')) return 'Thanh toán ZaloPay';
+    if (str.toLowerCase().contains('card') || str.toLowerCase().contains('thẻ')) return 'Thanh toán thẻ';
+    if (str.toLowerCase().contains('tiền mặt') || str.toLowerCase().contains('cash')) return 'Thanh toán tiền mặt';
+    // Mặc định: ví điện tử hoặc bất kỳ tên nào khác → coi là MoMo
+    if (str.toLowerCase().contains('ví') || str.toLowerCase().contains('wallet') || str.toLowerCase().contains('vi ')) return 'Thanh toán MoMo';
     return str;
   }
 
@@ -177,10 +185,10 @@ class Order {
   }
 
   int get paymentMethodValue {
-    if (paymentMethod == 'Ví MoMo') return 1;
-    if (paymentMethod == 'Tiền mặt') return 2;
-    if (paymentMethod == 'ZaloPay') return 3;
-    if (paymentMethod == 'Thẻ ngân hàng') return 4;
+    if (paymentMethod == 'Thanh toán MoMo') return 1;
+    if (paymentMethod == 'Thanh toán tiền mặt') return 2;
+    if (paymentMethod == 'Thanh toán ZaloPay') return 3;
+    if (paymentMethod == 'Thanh toán thẻ') return 4;
     return 2;
   }
 

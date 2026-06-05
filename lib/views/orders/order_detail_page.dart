@@ -323,6 +323,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   }
 
   Widget _buildPaymentSummary(Order order) {
+    String paymentMethodName = _getPaymentMethodName(order.paymentMethod);
+    IconData paymentIcon = _getPaymentMethodIcon(order.paymentMethod);
+
     return _card('Thanh toán', [
       _payRow('Tổng món', '${order.totalAmount.toInt()}đ'),
       _payRow('Phí giao hàng', '${order.deliveryFee.toInt()}đ'),
@@ -342,9 +345,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
           children: [
             Row(
               children: [
-                Icon(Icons.payment, size: 16, color: order.paymentStatus == 2 ? Colors.green : Colors.orange),
+                Icon(paymentIcon, size: 16, color: order.paymentStatus == 2 ? Colors.green : Colors.orange),
                 const SizedBox(width: 8),
-                Text(order.paymentMethod, style: TextStyle(color: order.paymentStatus == 2 ? Colors.green : Colors.orange, fontSize: 13, fontWeight: FontWeight.w500)),
+                Text(paymentMethodName, style: TextStyle(color: order.paymentStatus == 2 ? Colors.green : Colors.orange, fontSize: 13, fontWeight: FontWeight.w500)),
               ],
             ),
             Text(order.paymentStatus == 2 ? 'Đã thanh toán' : 'Chưa thanh toán', style: TextStyle(color: order.paymentStatus == 2 ? Colors.green : Colors.orange, fontSize: 13, fontWeight: FontWeight.bold)),
@@ -352,6 +355,44 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         ),
       ),
     ]);
+  }
+
+  String _getPaymentMethodName(String paymentMethod) {
+    switch (paymentMethod.toString().trim()) {
+      case '1':
+      case 'momo':
+        return 'Thanh toán MoMo';
+      case '2':
+      case 'cash':
+        return 'Thanh toán tiền mặt';
+      case '3':
+      case 'zalo':
+        return 'Thanh toán ZaloPay';
+      case '4':
+      case 'card':
+        return 'Thanh toán thẻ';
+      default:
+        return paymentMethod.isNotEmpty ? paymentMethod : 'Không xác định';
+    }
+  }
+
+  IconData _getPaymentMethodIcon(String paymentMethod) {
+    switch (paymentMethod.toString().trim()) {
+      case '1':
+      case 'momo':
+        return Icons.account_balance_wallet;
+      case '2':
+      case 'cash':
+        return Icons.payments_outlined;
+      case '3':
+      case 'zalo':
+        return Icons.account_balance_wallet;
+      case '4':
+      case 'card':
+        return Icons.credit_card;
+      default:
+        return Icons.payment;
+    }
   }
 
   Widget _row(IconData icon, String label, String value) {
