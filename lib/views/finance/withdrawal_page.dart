@@ -10,7 +10,6 @@ class WithdrawalPage extends StatefulWidget {
   @override
   State<WithdrawalPage> createState() => _WithdrawalPageState();
 }
-
 class _WithdrawalPageState extends State<WithdrawalPage> {
   final _amountCtrl = TextEditingController();
   final WalletApiService _apiService = WalletApiService();
@@ -121,7 +120,7 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
                   children: [
                     const Text('Số dư khả dụng', style: TextStyle(color: Colors.grey, fontSize: 12)),
                     Text(
-                      _currencyFormat.format(_wallet?.balance ?? 0),
+                      _currencyFormat.format((_wallet?.balance ?? 0) - (_wallet?.pendingBalance ?? 0)),
                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFFFF6B35)),
                     ),
                   ],
@@ -146,7 +145,7 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
-            children: [500000, 1000000, 2000000, 5000000].map((amt) {
+            children: [100000, 200000,500000, 1000000].map((amt) {
               return ActionChip(
                 label: Text('${amt ~/ 1000}K'),
                 onPressed: () => setState(() => _amountCtrl.text = amt.toString()),
@@ -223,7 +222,7 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Lịch sử Rút tiền', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2D))),
+          const Text('Lịch sử rút tiền', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E1E2D))),
           const Divider(height: 24),
           ..._history.map((h) => _buildHistoryRow(h)),
         ],
@@ -283,8 +282,13 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '-${_currencyFormat.format(h.amount)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1E1E2D)),
+                  (statusColor == Colors.red ? '+' : '-') + '${_currencyFormat.format(h.amount)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold, 
+                    fontSize: 15, 
+                    color: statusColor == Colors.red ? Colors.grey : const Color(0xFF1E1E2D),
+                    decoration: statusColor == Colors.red ? TextDecoration.lineThrough : null,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Container(
@@ -346,7 +350,7 @@ class _WithdrawalPageState extends State<WithdrawalPage> {
           id: _wallet!.id,
           userId: _wallet!.userId,
           role: _wallet!.role,
-          balance: _wallet!.balance - amount,
+          balance: _wallet!.balance, // Không trừ balance ở trạng thái chờ
           totalEarned: _wallet!.totalEarned,
           totalWithdrawn: _wallet!.totalWithdrawn,
           pendingBalance: _wallet!.pendingBalance + amount,

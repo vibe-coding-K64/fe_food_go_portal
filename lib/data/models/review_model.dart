@@ -9,6 +9,7 @@ class Review {
   final double rating;
   final String comment;
   final String? merchantReply;
+  final List<String>? imageUrls;
   final DateTime? createdAt;
   final DateTime? repliedAt;
 
@@ -23,11 +24,17 @@ class Review {
     required this.rating,
     required this.comment,
     this.merchantReply,
+    this.imageUrls,
     this.createdAt,
     this.repliedAt,
   });
 
   factory Review.fromJson(Map<String, dynamic> json) {
+    List<String>? images;
+    if (json['imageUrls'] != null) {
+      images = List<String>.from(json['imageUrls']);
+    }
+
     return Review(
       id: json['id'],
       storeId: json['storeId'] ?? '',
@@ -39,6 +46,7 @@ class Review {
       rating: (json['starRating'] ?? json['rating'] ?? 0).toDouble(),
       comment: json['comment'] ?? '',
       merchantReply: json['replyComment'] ?? json['merchantReply'],
+      imageUrls: images,
       createdAt: _parseDate(json['createdAt']),
       repliedAt: _parseDate(json['repliedAt']),
     );
@@ -68,6 +76,7 @@ class Review {
       'rating': rating,
       'comment': comment,
       'merchantReply': merchantReply,
+      'imageUrls': imageUrls,
       'createdAt': createdAt?.toIso8601String(),
       'repliedAt': repliedAt?.toIso8601String(),
     };
