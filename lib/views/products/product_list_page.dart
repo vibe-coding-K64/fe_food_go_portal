@@ -23,6 +23,9 @@ class _ProductListPageState extends State<ProductListPage> {
   String _filterCategory = 'Tất cả';
   List<String> _categories = ['Tất cả'];
 
+  int _currentPage = 1;
+  static const int _itemsPerPage = 10;
+
   @override
   void initState() {
     super.initState();
@@ -37,7 +40,11 @@ class _ProductListPageState extends State<ProductListPage> {
   }
 
   void _onSearchQueryChanged() {
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {
+        _currentPage = 1;
+      });
+    }
   }
 
   Future<void> _fetchData() async {
@@ -119,8 +126,19 @@ class _ProductListPageState extends State<ProductListPage> {
     }).toList();
   }
 
+  List<Product> get _paginatedProducts {
+    final all = _filtered;
+    final startIndex = (_currentPage - 1) * _itemsPerPage;
+    if (startIndex >= all.length) return [];
+    final endIndex = startIndex + _itemsPerPage;
+    return all.sublist(startIndex, endIndex > all.length ? all.length : endIndex);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final paginated = _paginatedProducts;
+    final totalPages = (_filtered.length / _itemsPerPage).ceil();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -163,7 +181,10 @@ class _ProductListPageState extends State<ProductListPage> {
                 child: ChoiceChip(
                   label: Text(cat),
                   selected: isSelected,
-                  onSelected: (_) => setState(() => _filterCategory = cat),
+                  onSelected: (_) => setState(() {
+                    _filterCategory = cat;
+                    _currentPage = 1;
+                  }),
                   selectedColor: const Color(0xFFFF6B35),
                   labelStyle: TextStyle(
                       color: isSelected ? Colors.white : Colors.grey.shade700,
@@ -179,22 +200,63 @@ class _ProductListPageState extends State<ProductListPage> {
         ),
         const SizedBox(height: 16),
         Expanded(
-          child: _isLoading 
-            ? const Center(child: CircularProgressIndicator())
-            : _filtered.isEmpty
-                ? const Center(child: Text('Không có món ăn nào.'))
-                : GridView.builder(
-                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: 280,
-                      mainAxisExtent: 260,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                    ),
-                    itemCount: _filtered.length,
-                    itemBuilder: (context, i) => _buildProductCard(i, _filtered[i]),
-                  ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8F9FA),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: [
+                Expanded(
+                  child: _isLoading 
+                    ? const Center(child: CircularProgressIndicator())
+                    : _filtered.isEmpty
+                        ? const Center(child: Text('Không có món ăn nào.'))
+                        : GridView.builder(
+                            padding: const EdgeInsets.all(24),
+                            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 280,
+                              mainAxisExtent: 260,
+                              crossAxisSpacing: 16,
+                              mainAxisSpacing: 16,
+                            ),
+                            itemCount: paginated.length,
+                            itemBuilder: (context, i) => _buildProductCard(i, paginated[i]),
+                          ),
+                ),
+                if (totalPages > 1) _buildPaginationControls(totalPages),
+              ],
+            ),
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPaginationControls(int totalPages) {
+    return Container(
+      padding: const EdgeInsets.only(top: 5, bottom: 5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: _currentPage > 1 ? () => setState(() => _currentPage--) : null,
+          ),
+          const SizedBox(width: 16),
+          Text('Trang $_currentPage / $totalPages', style: const TextStyle(fontWeight: FontWeight.w500)),
+          const SizedBox(width: 16),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            onPressed: _currentPage < totalPages ? () => setState(() => _currentPage++) : null,
+          ),
+        ],
+      ),
     );
   }
 
