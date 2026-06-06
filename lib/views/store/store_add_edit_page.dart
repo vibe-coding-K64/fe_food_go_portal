@@ -7,7 +7,6 @@ import '../../data/services/auth_service.dart';
 import 'package:dio/dio.dart';
 import 'package:geolocator/geolocator.dart';
 import '../widgets/image_upload_field.dart';
-/// Form dùng chung cho thêm/sửa thông tin quán
 class StoreFormPage extends StatefulWidget {
   final bool isEdit;
   final Function(String)? onNavigate;

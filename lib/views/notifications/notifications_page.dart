@@ -116,7 +116,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(n['title'] ?? '',
+                  Text((n['title'] ?? '').toString().replaceAll('🛒 ', '').replaceAll('🛒', ''),
                       style: TextStyle(
                           fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
                           fontSize: 14,
@@ -149,7 +149,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   IconData _typeIcon(String type) {
     switch (type) {
       case '11':
-      case '21': return Icons.add_shopping_cart;
+      case '21': return Icons.receipt_long_outlined;
       case '1': return Icons.shopping_bag_outlined;
       case '2': return Icons.account_balance_wallet_outlined;
       case '3': return Icons.star_outline;

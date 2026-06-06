@@ -5,7 +5,6 @@ import '../../data/services/voucher_api_service.dart';
 import '../../data/services/auth_service.dart';
 import '../widgets/image_upload_field.dart';
 
-/// Form dùng chung thêm/sửa voucher
 class VoucherFormPage extends StatefulWidget {
   static Voucher? selectedVoucherToEdit;
 
