@@ -122,44 +122,8 @@ class OrderBadgeService {
         final currentCancelledIds = cancelledOrders.map((o) => o.id).whereType<String>().toSet();
 
         if (!_isFirstFetch) {
-          // Phát hiện đơn hàng mới (pending mới xuất hiện)
-          final newOrderIds = currentPendingIds.difference(_knownPendingOrderIds);
-          for (final newId in newOrderIds) {
-            final order = pendingOrders.firstWhere((o) => o.id == newId);
-            final receiverName = order.receiverName ?? 'Khách hàng';
-            final code = order.code ?? newId.substring(newId.length > 6 ? newId.length - 6 : 0).toUpperCase();
-            final amount = order.finalAmount ?? order.totalAmount ?? 0;
-
-            // Tạo thông báo đơn hàng mới trên chuông
-            NotificationService().addLocalNotification({
-              'id': 'new_order_$newId',
-              'type': 21,
-              'title': '🛒 Đơn hàng mới từ $receiverName',
-              'body': '#$code · ${amount > 0 ? "${amount.toStringAsFixed(0)}đ" : ""} · Chờ xác nhận',
-              'orderId': newId,
-              'isRead': false,
-              'createdAt': DateTime.now().toIso8601String(),
-            });
-          }
-
-          // Phát hiện đơn hàng bị hủy (từ pending biến mất và xuất hiện ở cancelled)
-          final disappearedIds = _knownPendingOrderIds.difference(currentPendingIds);
-          for (final goneId in disappearedIds) {
-            if (currentCancelledIds.contains(goneId)) {
-              final order = cancelledOrders.firstWhere((o) => o.id == goneId);
-              final code = order.code ?? goneId.substring(goneId.length > 6 ? goneId.length - 6 : 0).toUpperCase();
-              
-              NotificationService().addLocalNotification({
-                'id': 'cancel_order_$goneId',
-                'type': 4,
-                'title': 'Đơn hàng #$code đã bị hủy',
-                'body': 'Khách hàng đã hủy đơn hàng này.',
-                'orderId': goneId,
-                'isRead': false,
-                'createdAt': DateTime.now().toIso8601String(),
-              });
-            }
-          }
+          // (Backend đã xử lý việc gửi thông báo notification vào database,
+          // nên không cần tự động tạo local notification ở đây nữa để tránh trùng lặp)
         }
 
         _knownPendingOrderIds = currentPendingIds;

@@ -283,6 +283,28 @@ class _ReviewsPageState extends State<ReviewsPage> {
           ),
           const SizedBox(height: 12),
           Text(review.comment, style: const TextStyle(fontSize: 14, height: 1.5)),
+          if (review.imageUrls != null && review.imageUrls!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: review.imageUrls!.map((url) => ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  url,
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.cover,
+                  errorBuilder: (ctx, err, st) => Container(
+                    width: 80,
+                    height: 80,
+                    color: Colors.grey.shade200,
+                    child: const Icon(Icons.broken_image, color: Colors.grey),
+                  ),
+                ),
+              )).toList(),
+            ),
+          ],
           if (hasReplied) ...[
             const SizedBox(height: 12),
             Container(

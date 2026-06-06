@@ -202,7 +202,7 @@ class NotificationService {
       // fallback to scaffoldMessenger if navigator not ready
       final messenger = MyApp.scaffoldMessengerKey.currentState;
       if (messenger == null) return;
-      final title = notif['title']?.toString() ?? 'Thông báo mới';
+      final title = (notif['title']?.toString() ?? 'Thông báo mới').replaceAll('🛒 ', '').replaceAll('🛒', '');
       final body = notif['body']?.toString() ?? '';
       messenger.showSnackBar(SnackBar(
         content: Text('$title${body.isNotEmpty ? '\n$body' : ''}'),
@@ -212,7 +212,7 @@ class NotificationService {
       return;
     }
 
-    final title = notif['title']?.toString() ?? 'Thông báo mới';
+    final title = (notif['title']?.toString() ?? 'Thông báo mới').replaceAll('🛒 ', '').replaceAll('🛒', '');
     final body = notif['body']?.toString() ?? '';
 
     try {

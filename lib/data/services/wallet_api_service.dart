@@ -48,6 +48,35 @@ class WalletApiService {
     }
   }
 
+  Future<void> approveWithdrawal(String transactionId) async {
+    try {
+      final response = await _dio.post('/admin/transactions/withdrawals/$transactionId/approve');
+      if (response.statusCode == 200 && response.data['success'] == true) return;
+      throw Exception(response.data['message'] ?? 'Duyệt thất bại');
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        throw Exception(e.response?.data['message'] ?? 'Duyệt thất bại');
+      }
+      throw Exception('Lỗi kết nối Server: $e');
+    }
+  }
+
+  Future<void> rejectWithdrawal(String transactionId, {String reason = 'Không được duyệt'}) async {
+    try {
+      final response = await _dio.post(
+        '/admin/transactions/withdrawals/$transactionId/reject',
+        queryParameters: {'reason': reason},
+      );
+      if (response.statusCode == 200 && response.data['success'] == true) return;
+      throw Exception(response.data['message'] ?? 'Từ chối thất bại');
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.data != null) {
+        throw Exception(e.response?.data['message'] ?? 'Từ chối thất bại');
+      }
+      throw Exception('Lỗi kết nối Server: $e');
+    }
+  }
+
   Future<Transaction> requestWithdraw(double amount, String bankName, String bankAccountNumber, String bankAccountName) async {
     try {
       final response = await _dio.post(

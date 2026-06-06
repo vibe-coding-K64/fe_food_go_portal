@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../data/services/auth_service.dart';
+import '../../data/services/image_upload_service.dart';
 
 class ProfilePage extends StatefulWidget {
   final Function(String)? onNavigate;
@@ -25,6 +26,13 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     _loadProfile();
+    _photoCtrl.addListener(() {
+      if (mounted && _photoUrl != _photoCtrl.text) {
+        setState(() {
+          _photoUrl = _photoCtrl.text;
+        });
+      }
+    });
   }
 
   Future<void> _loadProfile() async {
@@ -78,8 +86,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   child: Column(
                     children: [
                       GestureDetector(
-                        onTap: _showUpdatePhotoDialog,
+                        onTap: _pickAndUploadAvatar,
                         child: Stack(
+                          clipBehavior: Clip.none,
                           children: [
                             Stack(
                               alignment: Alignment.center,
@@ -109,6 +118,19 @@ class _ProfilePageState extends State<ProfilePage> {
                                   child: const Center(child: CircularProgressIndicator(color: Colors.white)),
                                 ),
                               ),
+                            Positioned(
+                              top: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4, spreadRadius: 1)],
+                                ),
+                                child: const Icon(Icons.camera_alt, size: 18, color: Color(0xFFFF6B35)),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -146,7 +168,6 @@ class _ProfilePageState extends State<ProfilePage> {
                       _field('Email', _emailCtrl, Icons.email_outlined),
                       _field('Số điện thoại', _phoneCtrl, Icons.phone_outlined),
                       _field('Mã số thuế', _taxCtrl, Icons.receipt_long_outlined),
-                      _field('Ảnh đại diện (URL)', _photoCtrl, Icons.image_outlined),
                     ]),
                     const SizedBox(height: 16),
                     _buildCard('Bảo mật', [
@@ -421,37 +442,23 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Future<void> _showUpdatePhotoDialog() async {
-    final ctrl = TextEditingController(text: _photoCtrl.text);
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        title: const Text('Cập nhật Ảnh đại diện', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: ctrl,
-          decoration: InputDecoration(
-            labelText: 'URL Ảnh (bắt đầu bằng http...)',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFFF6B35))),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy', style: TextStyle(color: Colors.grey))),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF6B35), foregroundColor: Colors.white),
-            onPressed: () {
-              setState(() {
-                _photoUrl = ctrl.text.trim();
-                _photoCtrl.text = ctrl.text.trim();
-              });
-              Navigator.pop(ctx);
-            },
-            child: const Text('Lưu Link'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _pickAndUploadAvatar() async {
+    final service = ImageUploadService();
+    final file = await service.pickImage();
+    if (file != null) {
+      setState(() => _isUploadingImage = true);
+      try {
+        final url = await service.uploadImage(file, folderPath: 'merchants');
+        setState(() {
+          _photoUrl = url;
+          _photoCtrl.text = url;
+        });
+      } catch (e) {
+        if (mounted) _showErrorDialog(e.toString());
+      } finally {
+        if (mounted) setState(() => _isUploadingImage = false);
+      }
+    }
   }
 
   Future<void> _save() async {
