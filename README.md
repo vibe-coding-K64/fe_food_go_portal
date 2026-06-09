@@ -48,7 +48,7 @@ flutter run
 ```
 ## Tài khoản Test 
 Sử dụng tài khoản sau để đăng nhập vào hệ thống quản trị cửa hàng:
-- **Email:** `luudinhnghia30012005@gmail.com.com` 
+- **Email:** `luudinhnghia30012005@gmail.com` 
 - **Mật khẩu:** `nghia123`
 - **Role:** Merchant (3)
 *(Lưu ý: Nếu Firebase Auth đã bị reset, vui lòng đăng ký một tài khoản mới trực tiếp trên màn hình Đăng ký).*
